@@ -116,35 +116,35 @@ li { margin:4px 0; }
 
 /* ==================== 手机适配 ==================== */
 @media (max-width: 768px) {
-  .sidebar-toggle { display: block; }
+  .sidebar-toggle { display: block !important; }
   .sidebar {
+    display: none !important;
+  }
+  .sidebar.open {
+    display: block !important;
     position: fixed;
-    left: -280px;
     top: 0;
+    left: 0;
     bottom: 0;
     width: 280px;
     z-index: 1000;
-    transition: left 0.3s ease;
     border-right: 1px solid var(--border);
     padding: 20px 16px;
-  }
-  .sidebar.open {
-    left: 0;
+    overflow-y: auto;
   }
   .sidebar-overlay.open {
-    display: block;
+    display: block !important;
   }
   .main {
-    margin-left: 0;
-    padding: 16px;
-    padding-top: 60px;
+    margin-left: 0 !important;
+    padding: 16px !important;
+    padding-top: 60px !important;
   }
   .tabs {
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding-top: 40px;
   }
   .tabs::-webkit-scrollbar { display: none; }
   .tab { padding: 8px 12px; font-size: 13px; }
