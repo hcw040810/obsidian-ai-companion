@@ -90,6 +90,43 @@ li { margin:4px 0; }
 .search-box button { padding:12px 24px; font-size:16px; }
 .search-result { margin:12px 0; padding:16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
 .search-result .match { background:rgba(88,166,255,0.15); padding:2px 4px; border-radius:3px; }
+
+/* ==================== 手机适配 ==================== */
+@media (max-width: 768px) {
+  .sidebar {
+    position: relative;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+  }
+  .main {
+    margin-left: 0;
+    padding: 16px;
+  }
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 8px 12px; font-size: 13px; }
+  h2 { font-size: 18px; }
+  h3 { font-size: 14px; }
+  .grid2, .grid3, .grid4 {
+    grid-template-columns: 1fr;
+  }
+  .bubble .content { max-width: 85%; font-size: 13px; }
+  .chat-input-area { flex-direction: column; }
+  .chat-input-area input { width: 100%; }
+  .btn { padding: 10px 16px; font-size: 15px; }
+  .metric .val { font-size: 18px; }
+  .metric .label { font-size: 11px; }
+  textarea { min-height: 150px; font-size: 13px; }
+  .expander summary { font-size: 13px; }
+  table { font-size: 12px; }
+}
 .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; margin:2px; }
 .tag.green { background:#0d2818; color:var(--green); border:1px solid #238636; }
 .tag.blue { background:#0d1f3d; color:var(--blue); border:1px solid #1f6feb; }
