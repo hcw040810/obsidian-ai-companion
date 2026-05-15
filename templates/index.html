@@ -91,61 +91,9 @@ li { margin:4px 0; }
 .search-result { margin:12px 0; padding:16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
 .search-result .match { background:rgba(88,166,255,0.15); padding:2px 4px; border-radius:3px; }
 
-/* ==================== 汉堡菜单按钮 ==================== */
-.sidebar-toggle {
-  display: none;
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 1001;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--text);
-  font-size: 20px;
-  cursor: pointer;
-}
-.sidebar-overlay {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 999;
-}
-
 /* ==================== 手机适配 ==================== */
 @media (max-width: 768px) {
-  .sidebar-toggle { display: block !important; }
-  .sidebar {
-    display: none !important;
-  }
-  .sidebar.open {
-    display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    z-index: 1000;
-    border-right: 1px solid var(--border);
-    padding: 20px 16px;
-    overflow-y: auto;
-  }
-  .sidebar-overlay.open {
-    display: block !important;
-  }
-  .main {
-    margin-left: 0 !important;
-    padding: 16px !important;
-    padding-top: 60px !important;
-  }
-  .tabs {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
+  .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
   .tab { padding: 8px 12px; font-size: 13px; }
   h2 { font-size: 18px; }
@@ -170,18 +118,18 @@ li { margin:4px 0; }
 </head>
 <body>
 
-<!-- 手机端汉堡菜单 -->
-<button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<!-- 手机端汉堡菜单（默认隐藏，JS 控制显示） -->
+<button id="sidebar-toggle" style="display:none;position:fixed;top:12px;left:12px;z-index:1001;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:20px;cursor:pointer;" onclick="toggleSidebar()">☰</button>
+<div id="sidebar-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;" onclick="toggleSidebar()"></div>
 
-<div class="sidebar" id="sidebar">
+<div id="sidebar" style="position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--bg2);padding:24px 20px;overflow-y:auto;border-right:1px solid var(--border);">
   <h1>🧠 观察者</h1>
   <p>你的个人 AI 伴侣</p>
   <hr style="border-color:var(--border);margin:16px 0">
   <div id="sidebar-stats">加载中...</div>
 </div>
 
-<div class="main">
+<div id="main-content" class="mobile-main" style="margin-left:260px;padding:24px 32px;max-width:1200px;">
   <div class="tabs" role="tablist">
     <button class="tab active" data-tab="chat" role="tab">💬 对话</button>
     <button class="tab" data-tab="search" role="tab">🔍 搜索回忆</button>
@@ -379,11 +327,52 @@ li { margin:4px 0; }
 </div>
 
 <script>
-// ---- 侧边栏开关 ----
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.querySelector('.sidebar-overlay').classList.toggle('open');
+// ---- 响应式侧边栏（纯 JS，不依赖 CSS media query）----
+function isMobile() { return window.innerWidth <= 768; }
+
+function setupResponsive() {
+  const sidebar = document.getElementById('sidebar');
+  const toggle = document.getElementById('sidebar-toggle');
+  const overlay = document.getElementById('sidebar-overlay');
+  const main = document.getElementById('main-content');
+
+  if (isMobile()) {
+    sidebar.style.display = 'none';
+    main.style.marginLeft = '0';
+    main.style.paddingTop = '60px';
+    toggle.style.display = 'block';
+  } else {
+    sidebar.style.display = 'block';
+    sidebar.style.left = '0';
+    main.style.marginLeft = '260px';
+    main.style.paddingTop = '24px';
+    toggle.style.display = 'none';
+    overlay.style.display = 'none';
+  }
 }
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.style.display === 'block';
+  if (isOpen) {
+    sidebar.style.display = 'none';
+    overlay.style.display = 'none';
+  } else {
+    sidebar.style.display = 'block';
+    sidebar.style.position = 'fixed';
+    sidebar.style.left = '0';
+    sidebar.style.top = '0';
+    sidebar.style.bottom = '0';
+    sidebar.style.width = '280px';
+    sidebar.style.zIndex = '1000';
+    overlay.style.display = 'block';
+  }
+}
+
+// 页面加载和窗口变化时自动调整
+setupResponsive();
+window.addEventListener('resize', setupResponsive);
 
 // ---- Tab 切换 ----
 document.querySelectorAll('.tab').forEach(t => {
