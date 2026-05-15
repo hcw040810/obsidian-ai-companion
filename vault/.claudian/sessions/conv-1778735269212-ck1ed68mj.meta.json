@@ -1,0 +1,24 @@
+{
+  "id": "conv-1778735269212-ck1ed68mj",
+  "providerId": "claude",
+  "title": "帮我看看这个吧",
+  "titleGenerationStatus": "failed",
+  "createdAt": 1778735269212,
+  "updatedAt": 1778735734590,
+  "lastResponseAt": 1778735298411,
+  "sessionId": "7ad8ba98-3684-4b2b-9ba3-ebbe63bbbc29",
+  "providerState": {
+    "providerSessionId": "7ad8ba98-3684-4b2b-9ba3-ebbe63bbbc29"
+  },
+  "currentNote": "未命名.md",
+  "usage": {
+    "model": "opus",
+    "inputTokens": 216,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 29888,
+    "contextWindow": 1000000,
+    "contextTokens": 30104,
+    "percentage": 3,
+    "contextWindowIsAuthoritative": true
+  }
+}

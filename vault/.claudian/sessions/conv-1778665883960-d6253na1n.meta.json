@@ -1,0 +1,23 @@
+{
+  "id": "conv-1778665883960-d6253na1n",
+  "providerId": "claude",
+  "title": "哈喽",
+  "titleGenerationStatus": "failed",
+  "createdAt": 1778665883960,
+  "updatedAt": 1778735753614,
+  "lastResponseAt": 1778734198446,
+  "sessionId": "d6b7f35d-428b-43c3-a6d1-fe954acf0fed",
+  "providerState": {
+    "providerSessionId": "d6b7f35d-428b-43c3-a6d1-fe954acf0fed"
+  },
+  "usage": {
+    "model": "opus",
+    "inputTokens": 202,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 52608,
+    "contextWindow": 1000000,
+    "contextTokens": 52810,
+    "percentage": 5,
+    "contextWindowIsAuthoritative": true
+  }
+}

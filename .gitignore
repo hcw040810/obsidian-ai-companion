@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/
+*.db
+.DS_Store
+vault/.obsidian/
+vault/附件/*.pdf
+vault/附件/*.jpg
+vault/附件/*.png

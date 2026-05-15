@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm list *)",
+      "Bash(cc-connect --help)",
+      "Bash(npm info *)",
+      "Bash(cc-connect daemon *)",
+      "Bash(cc-connect --force)",
+      "Bash(tasklist)",
+      "Bash(cc-connect sessions *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(taskkill *)",
+      "Bash(start cmd *)",
+      "Bash(npm root *)",
+      "WebFetch(domain:github.com)",
+      "Skill(firecrawl-cli-firecrawl-cli)",
+      "Skill(firecrawl-cli-firecrawl-cli:*)",
+      "Bash(npm install *)",
+      "WebFetch(domain:www.36kr.com)",
+      "WebFetch(domain:www.zhihu.com)",
+      "WebFetch(domain:sspai.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:news.ycombinator.com)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(curl -sL \"https://www.36kr.com/search/articles/AI%E5%8F%98%E7%8E%B0\" -o /tmp/36kr_test.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -sL \"https://sspai.com/search/post/AI%E5%8F%98%E7%8E%B0\" -o /tmp/sspai_test.html)",
+      "Bash(PYTHONIOENCODING=utf-8 python3)"
+    ]
+  }
+}

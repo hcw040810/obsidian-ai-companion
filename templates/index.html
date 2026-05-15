@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧠 观察者 - Obsidian AI Companion</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0e1117;
+  --bg2: #161b22;
+  --bg3: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+.sidebar { position:fixed; left:0; top:0; bottom:0; width:260px; background:var(--bg2); padding:24px 20px; overflow-y:auto; border-right:1px solid var(--border); }
+.sidebar h1 { font-size:22px; margin-bottom:4px; }
+.sidebar p { font-size:13px; color:var(--text2); margin-bottom:20px; }
+.sidebar .stat { font-size:14px; color:var(--text); margin:4px 0; }
+.sidebar .folder { font-size:12px; color:var(--text2); margin:2px 0; padding-left:4px; }
+.main { margin-left:260px; padding:24px 32px; max-width:1200px; }
+.tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:24px; flex-wrap:wrap; }
+.tab { padding:10px 16px; cursor:pointer; color:var(--text2); border:none; border-bottom:2px solid transparent; margin-bottom:-2px; font-size:14px; transition:all .2s; user-select:none; white-space:nowrap; background:none; font-family:inherit; }
+.tab:hover { color:var(--text); background:rgba(88,166,255,0.05); }
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tabcontent { display:none; animation:fadeIn .2s; }
+.tabcontent.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+h2 { font-size:22px; margin-bottom:16px; }
+h3 { font-size:15px; margin:16px 0 8px; color:var(--blue); }
+.btn { padding:8px 18px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); color:var(--text); cursor:pointer; font-size:14px; transition:all .15s; }
+.btn:hover { background:var(--bg3); border-color:var(--text2); }
+.btn.primary { background:#238636; border-color:#238636; color:#fff; font-weight:500; }
+.btn.primary:hover { background:#2ea043; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.input { width:100%; padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; transition:border-color .2s; }
+.input:focus { border-color:var(--blue); outline:none; }
+
+/* 聊天气泡 */
+.chat-area { max-height:60vh; overflow-y:auto; padding:10px 0; }
+.bubble { display:flex; margin:12px 0; gap:10px; }
+.bubble.user { flex-direction:row-reverse; }
+.bubble .avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.bubble.user .avatar { background:#1f3a5f; }
+.bubble.ai .avatar { background:var(--bg2); border:1px solid var(--border); }
+.bubble .content { max-width:75%; padding:12px 16px; border-radius:12px; font-size:14px; line-height:1.6; word-wrap:break-word; }
+.bubble.user .content { background:#1f3a5f; border-bottom-right-radius:4px; }
+.bubble.ai .content { background:var(--bg2); border:1px solid var(--border); border-bottom-left-radius:4px; }
+.bubble .time { font-size:11px; color:var(--text2); margin-top:4px; }
+.bubble.user .time { text-align:right; }
+.thinking { display:flex; align-items:center; gap:8px; padding:12px 16px; color:var(--text2); font-size:14px; }
+.dots span { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--blue); animation:dotPulse 1.4s infinite; margin:0 2px; }
+.dots span:nth-child(2) { animation-delay:.2s; }
+.dots span:nth-child(3) { animation-delay:.4s; }
+@keyframes dotPulse { 0%,80%,100%{opacity:.3;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
+
+.chat-input-area { display:flex; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+.chat-input-area input { flex:1; }
+
+.spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.status { padding:12px 16px; border-radius:8px; margin:12px 0; font-size:14px; display:flex; align-items:center; gap:10px; }
+.status.info { background:#0d2818; border:1px solid #238636; color:var(--green); }
+.status.error { background:#3d1414; border:1px solid var(--red); color:var(--red); }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px; margin:12px 0; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.metric { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+.metric .val { font-size:24px; font-weight:bold; color:var(--blue); }
+.metric .label { font-size:12px; color:var(--text2); margin-top:4px; }
+select { padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; min-width:200px; }
+textarea { width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:14px; resize:vertical; min-height:200px; font-family:inherit; line-height:1.6; }
+textarea:focus { border-color:var(--blue); outline:none; }
+.expander { border:1px solid var(--border); border-radius:8px; margin:8px 0; overflow:hidden; }
+.expander summary { padding:12px 16px; cursor:pointer; color:var(--blue); font-weight:500; }
+.expander summary:hover { background:var(--bg2); }
+.expander .content { padding:12px 16px; border-top:1px solid var(--border); }
+ul { padding-left:20px; }
+li { margin:4px 0; }
+.search-box { display:flex; gap:10px; margin-bottom:20px; }
+.search-box input { flex:1; padding:12px 16px; font-size:16px; border-radius:10px; }
+.search-box button { padding:12px 24px; font-size:16px; }
+.search-result { margin:12px 0; padding:16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
+.search-result .match { background:rgba(88,166,255,0.15); padding:2px 4px; border-radius:3px; }
+.tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; margin:2px; }
+.tag.green { background:#0d2818; color:var(--green); border:1px solid #238636; }
+.tag.blue { background:#0d1f3d; color:var(--blue); border:1px solid #1f6feb; }
+.tag.yellow { background:#2d1f00; color:var(--yellow); border:1px solid #9e6a03; }
+.tag.red { background:#3d1414; color:var(--red); border:1px solid #f85149; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h1>🧠 观察者</h1>
+  <p>你的个人 AI 伴侣</p>
+  <hr style="border-color:var(--border);margin:16px 0">
+  <div id="sidebar-stats">加载中...</div>
+</div>
+
+<div class="main">
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="chat" role="tab">💬 对话</button>
+    <button class="tab" data-tab="search" role="tab">🔍 搜索回忆</button>
+    <button class="tab" data-tab="profile" role="tab">👤 人格画像</button>
+    <button class="tab" data-tab="diary" role="tab">📊 日记分析</button>
+    <button class="tab" data-tab="timeline" role="tab">📈 情绪时间轴</button>
+    <button class="tab" data-tab="vault" role="tab">🗂️ 仓库概览</button>
+    <button class="tab" data-tab="study" role="tab">📚 考研驾驶舱</button>
+  </div>
+
+  <!-- 对话 -->
+  <div class="tabcontent active" id="tab-chat">
+    <h2>和观察者聊聊</h2>
+    <p style="color:var(--text2);margin-bottom:16px;font-size:14px">我已经读过你 Obsidian 里的所有内容，随便聊</p>
+    <div class="chat-area" id="chat-messages"></div>
+    <div class="chat-input-area">
+      <input class="input" id="chat-input" placeholder="说点什么..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="btn primary" onclick="sendChat()">发送</button>
+      <button class="btn" onclick="clearChat()">清空</button>
+    </div>
+  </div>
+
+  <!-- 搜索回忆 -->
+  <div class="tabcontent" id="tab-search">
+    <h2>搜索回忆</h2>
+    <p style="color:var(--text2);margin-bottom:16px;font-size:14px">用自然语言搜索你的过去 — 问任何关于你自己的问题</p>
+    <div class="search-box">
+      <input class="input" id="search-input" placeholder="例：我上个月在焦虑什么？我什么时候最开心？" onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn primary" onclick="doSearch()">🔍 搜索</button>
+    </div>
+    <div id="search-status"></div>
+    <div id="search-result"></div>
+    <div id="search-suggestions" style="margin-top:20px;">
+      <h3>💡 试试问这些</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        <button class="btn" onclick="quickSearch(this.textContent)">我最近为什么压力大？</button>
+        <button class="btn" onclick="quickSearch(this.textContent)">我什么时候进入过心流状态？</button>
+        <button class="btn" onclick="quickSearch(this.textContent)">我最焦虑的事情是什么？</button>
+        <button class="btn" onclick="quickSearch(this.textContent)">我和导师的关系怎么样？</button>
+        <button class="btn" onclick="quickSearch(this.textContent)">我最近的情绪变化趋势？</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 人格画像 -->
+  <div class="tabcontent" id="tab-profile">
+    <h2>你的人格画像</h2>
+    <p style="color:var(--text2);margin-bottom:16px;font-size:14px">基于你 Obsidian 里所有内容的综合分析</p>
+    <button class="btn primary" id="btn-profile" onclick="genProfile()">🔮 生成人格画像</button>
+    <div id="profile-status"></div>
+    <div id="profile-result"></div>
+  </div>
+
+  <!-- 日记分析 -->
+  <div class="tabcontent" id="tab-diary">
+    <h2>日记分析</h2>
+    <div style="margin-bottom:16px;">
+      <select id="diary-select" onchange="loadDiary()"></select>
+    </div>
+    <div class="grid2">
+      <div>
+        <h3>📝 日记原文</h3>
+        <textarea id="diary-content" readonly></textarea>
+      </div>
+      <div>
+        <h3>🤖 AI 分析</h3>
+        <button class="btn primary" id="btn-diary" onclick="analyzeDiary()">🔍 分析这篇日记</button>
+        <div id="diary-status"></div>
+        <div id="diary-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 情绪时间轴 -->
+  <div class="tabcontent" id="tab-timeline">
+    <h2>情绪时间轴</h2>
+    <p style="color:var(--text2);margin-bottom:16px;font-size:14px">用图表看你的心理变化趋势</p>
+    <button class="btn primary" id="btn-timeline" onclick="genTimeline()">📊 生成情绪时间轴</button>
+    <div id="timeline-status"></div>
+    <div id="timeline-result"></div>
+  </div>
+
+  <!-- 仓库概览 -->
+  <div class="tabcontent" id="tab-vault">
+    <h2>Obsidian 仓库概览</h2>
+    <div id="vault-info"></div>
+  </div>
+
+  <!-- 考研驾驶舱 -->
+  <div class="tabcontent" id="tab-study">
+    <h2>📚 考研驾驶舱</h2>
+    <p style="color:var(--text2);margin-bottom:20px;font-size:14px">AI 学习教练 — 智能排课、番茄钟、每日复盘</p>
+
+    <!-- 状态输入 + AI 排课 -->
+    <div class="card" style="margin-bottom:20px;">
+      <h3>🧠 AI 智能排课</h3>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:12px">告诉我你现在的状态，AI 帮你安排今天的任务</p>
+      <div class="grid3" style="margin-bottom:12px;">
+        <div>
+          <label style="font-size:13px;color:var(--text2)">精力水平</label>
+          <select id="study-energy" class="input" style="margin-top:4px">
+            <option value="高">🔋 高 — 状态好</option>
+            <option value="一般" selected>🔋 一般 — 普通</option>
+            <option value="低">🪫 低 — 很累</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:13px;color:var(--text2)">情绪状态</label>
+          <select id="study-mood" class="input" style="margin-top:4px">
+            <option value="好">😊 好</option>
+            <option value="一般" selected>😐 一般</option>
+            <option value="差">😔 差</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:13px;color:var(--text2)">可用时间</label>
+          <select id="study-hours" class="input" style="margin-top:4px">
+            <option value="4">4 小时</option>
+            <option value="6">6 小时</option>
+            <option value="8" selected>8 小时</option>
+            <option value="10">10 小时</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn primary" id="btn-schedule" onclick="genSchedule()">🎯 生成今日计划</button>
+      <div id="schedule-status"></div>
+      <div id="schedule-result"></div>
+    </div>
+
+    <!-- 番茄钟 -->
+    <div class="grid2">
+      <div class="card">
+        <h3>🍅 番茄钟</h3>
+        <div style="text-align:center;margin:20px 0;">
+          <div id="pomodoro-display" style="font-size:48px;font-weight:bold;color:var(--blue);font-family:monospace;">25:00</div>
+          <div id="pomodoro-status" style="color:var(--text2);margin:8px 0;">准备开始</div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+            <button class="btn primary" id="btn-pomodoro-start" onclick="pomodoroStart()">▶ 开始</button>
+            <button class="btn" id="btn-pomodoro-pause" onclick="pomodoroPause()" disabled>⏸ 暂停</button>
+            <button class="btn" id="btn-pomodoro-stop" onclick="pomodoroStop()" disabled>⏹ 结束</button>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <label style="font-size:13px;color:var(--text2)">当前任务</label>
+          <input class="input" id="pomodoro-task" placeholder="正在做什么..." style="margin-top:4px">
+          <select id="pomodoro-cat" class="input" style="margin-top:8px">
+            <option value="数学">📐 数学</option>
+            <option value="英语">📖 英语</option>
+            <option value="政治">📕 政治</option>
+            <option value="专业课">📗 专业课</option>
+            <option value="其他">📝 其他</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 今日统计 -->
+      <div class="card">
+        <h3>📊 今日统计</h3>
+        <div id="pomodoro-stats">
+          <div class="grid2" style="margin:12px 0;">
+            <div class="metric"><div class="val" id="stat-count">0</div><div class="label">完成番茄</div></div>
+            <div class="metric"><div class="val" id="stat-minutes">0</div><div class="label">总分钟</div></div>
+          </div>
+          <div id="stat-breakdown" style="font-size:13px;color:var(--text2);margin-top:12px;"></div>
+        </div>
+        <hr style="border-color:var(--border);margin:16px 0">
+        <button class="btn" onclick="genReview()">📝 生成今日复盘</button>
+        <div id="review-status"></div>
+        <div id="review-result"></div>
+      </div>
+    </div>
+
+    <!-- 任务管理 -->
+    <div class="card" style="margin-top:20px;">
+      <h3>📋 任务管理</h3>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <input class="input" id="new-task-title" placeholder="添加新任务..." style="flex:1">
+        <select id="new-task-cat" class="input" style="width:120px">
+          <option value="数学">📐 数学</option>
+          <option value="英语">📖 英语</option>
+          <option value="政治">📕 政治</option>
+          <option value="专业课">📗 专业课</option>
+          <option value="其他">📝 其他</option>
+        </select>
+        <select id="new-task-pri" class="input" style="width:100px">
+          <option value="high">🔴 高</option>
+          <option value="medium" selected>🟡 中</option>
+          <option value="low">🟢 低</option>
+        </select>
+        <button class="btn primary" onclick="addTask()">添加</button>
+      </div>
+      <div id="task-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Tab 切换 ----
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tabcontent').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+  });
+});
+
+// ---- API 调用 ----
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ---- 轮询任务 ----
+function pollTask(tid, interval, callback) {
+  const timer = setInterval(async () => {
+    const t = await api('/api/task/' + tid);
+    if (t.s === 'done') { clearInterval(timer); callback(null, t.r); }
+    else if (t.s === 'error') { clearInterval(timer); callback(t.e, null); }
+  }, interval);
+  return timer;
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function fmtTime() { return new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}); }
+
+// ---- 初始化 ----
+document.getElementById('sidebar-stats').innerHTML = '<div class="stat"><b>笔记总数</b>：加载中...</div>';
+api('/api/summary').then(s => {
+  let h = `<div class="stat"><b>笔记总数</b>：${s.total} 篇</div><hr style="border-color:var(--border);margin:10px 0">`;
+  for (const [f, c] of Object.entries(s.folders)) h += `<div class="folder">📁 ${f}：${c} 篇</div>`;
+  document.getElementById('sidebar-stats').innerHTML = h;
+});
+
+let loaded = {};
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', async () => {
+    const tab = t.dataset.tab;
+    if (tab === 'diary' && !loaded.diary) { loaded.diary=true; loadDiaryList(); }
+    if (tab === 'chat' && !loaded.chat) { loaded.chat=true; loadChatHistory(); }
+    if (tab === 'vault' && !loaded.vault) { loaded.vault=true; loadVault(); }
+  });
+});
+
+// ---- 对话（气泡 UI）----
+function addBubble(role, content, time) {
+  const div = document.getElementById('chat-messages');
+  const avatar = role === 'user' ? '🧑' : '🧠';
+  div.innerHTML += `<div class="bubble ${role}"><div class="avatar">${avatar}</div><div><div class="content">${content}</div><div class="time">${time||fmtTime()}</div></div></div>`;
+  div.scrollTop = div.scrollHeight;
+}
+
+function addThinking() {
+  const div = document.getElementById('chat-messages');
+  div.innerHTML += `<div class="bubble ai" id="chat-thinking"><div class="avatar">🧠</div><div class="thinking"><div class="dots"><span></span><span></span><span></span></div>思考中...</div></div>`;
+  div.scrollTop = div.scrollHeight;
+}
+
+async function loadChatHistory() {
+  const history = await api('/api/chat/history');
+  const div = document.getElementById('chat-messages');
+  div.innerHTML = '';
+  history.forEach(m => addBubble(m.role, m.content));
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addBubble('user', esc(msg));
+  addThinking();
+
+  const { task_id } = await api('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg}) });
+  pollTask(task_id, 1000, (err, result) => {
+    document.getElementById('chat-thinking')?.remove();
+    if (err) addBubble('ai', `<span style="color:var(--red)">出错了：${esc(err)}</span>`);
+    else addBubble('ai', result);
+  });
+}
+
+async function clearChat() {
+  await api('/api/chat/clear', {method:'POST'});
+  document.getElementById('chat-messages').innerHTML = '';
+}
+
+// ---- 搜索回忆 ----
+function quickSearch(q) {
+  document.getElementById('search-input').value = q;
+  doSearch();
+}
+
+async function doSearch() {
+  const input = document.getElementById('search-input');
+  const q = input.value.trim();
+  if (!q) return;
+  document.getElementById('search-status').innerHTML = '<div class="status info"><span class="spinner"></span> 正在搜索...</div>';
+  document.getElementById('search-result').innerHTML = '';
+
+  const { task_id } = await api('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q}) });
+  pollTask(task_id, 2000, (err, r) => {
+    document.getElementById('search-status').innerHTML = '';
+    if (err) { document.getElementById('search-result').innerHTML = `<div class="status error">搜索失败：${esc(err)}</div>`; return; }
+
+    let h = '';
+    if (r.answer) h += `<div class="card"><h3>💬 回答</h3><p>${r.answer}</p></div>`;
+    if (r.relevant_notes?.length) {
+      h += `<h3>📄 相关笔记</h3>`;
+      r.relevant_notes.forEach(n => {
+        h += `<div class="search-result"><b>${esc(n.title||'未知')}</b>${n.date?` <span style="color:var(--text2);font-size:12px">${esc(n.date)}</span>`:''}<p style="margin-top:6px;color:var(--text2);font-size:13px">${esc(n.excerpt||'')}</p></div>`;
+      });
+    }
+    if (r.insights?.length) {
+      h += `<h3>🔗 发现的规律</h3><ul>${r.insights.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
+    }
+    document.getElementById('search-result').innerHTML = h || '<div class="card">没有找到相关内容</div>';
+  });
+}
+
+// ---- 人格画像 ----
+async function genProfile() {
+  const btn = document.getElementById('btn-profile');
+  btn.disabled = true;
+  document.getElementById('profile-status').innerHTML = '<div class="status info"><span class="spinner"></span> 正在分析你的全部笔记...可能需要 30-60 秒</div>';
+  const { task_id } = await api('/api/profile/generate', {method:'POST'});
+  pollTask(task_id, 2000, (err, p) => {
+    btn.disabled = false;
+    document.getElementById('profile-status').innerHTML = '';
+    if (err) { document.getElementById('profile-result').innerHTML = `<div class="status error">生成失败：${esc(err)}</div>`; return; }
+
+    let h = '';
+    h += `<div class="card"><h3>${esc(p.name||'用户')}</h3><p><b>身份</b>：${esc(p.age_context||'未知')}</p><p><b>写作风格</b>：${esc(p.writing_style||'未知')}</p></div>`;
+    h += `<h3>🎯 最关心的主题</h3><div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">${(p.core_topics||[]).map(x=>`<span class="tag blue">${esc(x)}</span>`).join('')}</div>`;
+    h += `<div class="grid2"><div class="card"><h3>🧩 人格特征</h3><ul>${(p.personality_traits||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    h += `<div class="card"><h3>💪 优势</h3><ul>${(p.strengths||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`;
+    const ep = p.emotional_patterns || {};
+    h += `<h3>🌊 情绪模式</h3><div class="grid3"><div class="card"><b>主要情绪</b><ul>${(ep.dominant_emotions||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    h += `<div class="card"><b>情绪触发点</b><ul>${(ep.triggers||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    h += `<div class="card"><b>应对方式</b><ul>${(ep.coping_mechanisms||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`;
+    h += `<div class="grid2"><div class="card"><h3>🧭 价值观</h3><ul>${(p.values_and_beliefs||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    h += `<div class="card"><h3>🌱 成长方向</h3><ul>${(p.growth_areas||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`;
+    const rel = p.relationships || {};
+    h += `<h3>👥 人际关系</h3><p><b>社交风格</b>：${esc(rel.social_style||'未知')}</p><ul>${(rel.key_people||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+    h += `<div class="card"><h3>📝 一段话总结</h3><p>${esc(p.one_paragraph_summary||'')}</p></div>`;
+    document.getElementById('profile-result').innerHTML = h;
+  });
+}
+
+// ---- 日记分析 ----
+async function loadDiaryList() {
+  const diaries = await api('/api/diaries');
+  const sel = document.getElementById('diary-select');
+  sel.innerHTML = diaries.map(d => `<option value="${d.date}">${d.date} ${d.title}</option>`).join('');
+  if (diaries.length) loadDiary();
+}
+
+async function loadDiary() {
+  const date = document.getElementById('diary-select').value;
+  const d = await api('/api/diary/' + date);
+  document.getElementById('diary-content').value = d.content;
+  document.getElementById('diary-result').innerHTML = d.existing_summary ? `<div class="card">${d.existing_summary}</div>` : '';
+}
+
+async function analyzeDiary() {
+  const date = document.getElementById('diary-select').value;
+  const btn = document.getElementById('btn-diary');
+  btn.disabled = true;
+  document.getElementById('diary-status').innerHTML = '<div class="status info"><span class="spinner"></span> 分析中...</div>';
+  const { task_id } = await api('/api/diary/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({date}) });
+  pollTask(task_id, 1500, (err, r) => {
+    btn.disabled = false;
+    document.getElementById('diary-status').innerHTML = '';
+    if (err) { document.getElementById('diary-result').innerHTML = `<div class="status error">分析失败：${esc(err)}</div>`; return; }
+
+    let h = `<div class="card">`;
+    h += `<p><b>情绪</b>：${esc(r.mood||'未知')}${r.mood_emoji||''}</p>`;
+    if (r.mood_change) h += `<p><b>变化</b>：${esc(r.mood_change)}</p>`;
+    h += `<p><b>学习状态</b>：<span class="tag ${r.study_state==='心流'||r.study_state==='高效'?'green':r.study_state==='拖延'||r.study_state==='摆烂'?'red':'blue'}">${esc(r.study_state||'未知')}</span></p>`;
+    if (r.stress_source?.length) h += `<p><b>压力来源</b>：${r.stress_source.map(s=>`<span class="tag yellow">${esc(s)}</span>`).join(' ')}</p>`;
+    if (r.key_events?.length) h += `<p><b>关键事件</b>：<ul>${r.key_events.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></p>`;
+    if (r.ai_observation) h += `<p style="color:var(--green);margin-top:12px;padding:10px;background:#0d2818;border-radius:8px;">💡 ${esc(r.ai_observation)}</p>`;
+    h += `</div>`;
+    document.getElementById('diary-result').innerHTML = h;
+  });
+}
+
+// ---- 情绪时间轴 ----
+async function genTimeline() {
+  const btn = document.getElementById('btn-timeline');
+  btn.disabled = true;
+  document.getElementById('timeline-status').innerHTML = '<div class="status info"><span class="spinner"></span> 正在分析情绪数据...</div>';
+  const { task_id } = await api('/api/timeline/generate', {method:'POST'});
+  pollTask(task_id, 2000, (err, report) => {
+    btn.disabled = false;
+    document.getElementById('timeline-status').innerHTML = '';
+    if (err) { document.getElementById('timeline-result').innerHTML = `<div class="status error">生成失败：${esc(err)}</div>`; return; }
+    if (report.error) { document.getElementById('timeline-result').innerHTML = `<div class="status error">${esc(report.error)}</div>`; return; }
+
+    let h = `<div class="grid4">`;
+    h += `<div class="metric"><div class="val">${report.total_days}</div><div class="label">总天数</div></div>`;
+    h += `<div class="metric"><div class="val">${report.avg_score}</div><div class="label">平均情绪</div></div>`;
+    h += `<div class="metric"><div class="val">${report.trend}</div><div class="label">整体趋势</div></div>`;
+    h += `<div class="metric"><div class="val">${report.best_day?.date||'-'}</div><div class="label">最好的一天</div></div>`;
+    h += `</div>`;
+
+    const td = report.timeline || [];
+    const dist = report.distribution || {};
+    h += `<h3>情绪波动</h3><div class="card"><canvas id="lineChart" height="200"></canvas></div>`;
+    h += `<h3>情绪分布</h3><div class="card"><canvas id="barChart" height="160"></canvas></div>`;
+    h += `<div class="grid2">`;
+    h += `<div class="card"><h3>😊 最好的一天</h3><p><b>${esc(report.best_day?.date||'')}</b> — ${esc(report.best_day?.title||'')}</p><p style="color:var(--text2);font-size:13px">${esc(report.best_day?.preview||'')}</p></div>`;
+    h += `<div class="card"><h3>😔 最低的一天</h3><p><b>${esc(report.worst_day?.date||'')}</b> — ${esc(report.worst_day?.title||'')}</p><p style="color:var(--text2);font-size:13px">${esc(report.worst_day?.preview||'')}</p></div>`;
+    h += `</div>`;
+
+    // 详细数据
+    h += `<details class="expander"><summary>📋 详细数据 (${td.length} 天)</summary><div class="content">`;
+    const emoji = {积极:'🟢',较好:'🔵',一般:'⚪',低落:'🟡',消极:'🔴'};
+    td.forEach(t => { h += `<div style="padding:4px 0;border-bottom:1px solid var(--border)">${emoji[t.label]||'⚪'} <b>${esc(t.date)}</b> <span class="tag ${t.label==='积极'?'green':t.label==='消极'?'red':'blue'}">${esc(t.label)}</span> — ${esc(t.title||'')}</div>`; });
+    h += `</div></details>`;
+
+    document.getElementById('timeline-result').innerHTML = h;
+
+    // 折线图
+    const lineCtx = document.getElementById('lineChart');
+    if (lineCtx) {
+      const colors = td.map(t => ({积极:'#3fb950',较好:'#58a6ff',一般:'#8b949e',低落:'#d29922',消极:'#f85149'}[t.label]||'#58a6ff'));
+      new Chart(lineCtx, {
+        type:'line',
+        data:{ labels:td.map(t=>t.date.slice(5)), datasets:[{ label:'情绪值', data:td.map(t=>t.score), borderColor:'#58a6ff', backgroundColor:'rgba(88,166,255,0.08)', fill:true, tension:0.3, pointBackgroundColor:colors, pointRadius:6, pointHoverRadius:9, borderWidth:2.5 }] },
+        options:{ responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} 分`}}}, scales:{y:{min:0.5,max:5.5,ticks:{stepSize:1,color:'#8b949e'},grid:{color:'#21262d'}},x:{ticks:{color:'#8b949e',maxRotation:45},grid:{color:'#21262d'}}} }
+      });
+    }
+    const barCtx = document.getElementById('barChart');
+    if (barCtx) {
+      const bc = {消极:'#f85149',低落:'#d29922',一般:'#8b949e',较好:'#58a6ff',积极:'#3fb950'};
+      new Chart(barCtx, {
+        type:'bar',
+        data:{ labels:Object.keys(dist), datasets:[{ data:Object.values(dist), backgroundColor:Object.keys(dist).map(k=>bc[k]||'#58a6ff'), borderRadius:6, maxBarThickness:60 }] },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{ticks:{stepSize:1,color:'#8b949e'},grid:{color:'#21262d'}},x:{ticks:{color:'#8b949e'},grid:{display:false}}} }
+      });
+    }
+  });
+}
+
+// ---- 仓库概览 ----
+async function loadVault() {
+  const data = await api('/api/vault');
+  let h = '';
+  for (const [folder, notes] of Object.entries(data)) {
+    h += `<details class="expander"><summary>📁 ${esc(folder)} (${notes.length} 篇)</summary><div class="content">`;
+    notes.forEach(n => {
+      h += `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>${esc(n.title)}</b>${n.date?` <span style="color:var(--text2);font-size:12px">${esc(n.date)}</span>`:''}<br><span style="color:var(--text2);font-size:13px">${esc(n.preview)}...</span></div>`;
+    });
+    h += `</div></details>`;
+  }
+  document.getElementById('vault-info').innerHTML = h;
+}
+
+// ==================== 考研驾驶舱 ====================
+
+// ---- 任务管理 ----
+async function loadTasks() {
+  const tasks = await api('/api/study/tasks');
+  const div = document.getElementById('task-list');
+  if (!tasks.length) { div.innerHTML = '<p style="color:var(--text2)">还没有任务，添加一个吧</p>'; return; }
+  const catEmoji = {数学:'📐',英语:'📖',政治:'📕',专业课:'📗',其他:'📝'};
+  const priColor = {high:'var(--red)',medium:'var(--yellow)',low:'var(--green)'};
+  div.innerHTML = tasks.map(t => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);opacity:${t.status==='done'?0.5:1}">
+      <input type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}',this.checked)" style="width:18px;height:18px;cursor:pointer">
+      <span style="flex:1;${t.status==='done'?'text-decoration:line-through':''}">${catEmoji[t.category]||'📝'} ${esc(t.title)}</span>
+      <span style="font-size:11px;color:${priColor[t.priority]||'var(--text2)'}">${t.priority==='high'?'高优':t.priority==='medium'?'中':'低'}</span>
+      <button class="btn" style="padding:4px 8px;font-size:12px" onclick="deleteTask('${t.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+async function addTask() {
+  const title = document.getElementById('new-task-title').value.trim();
+  if (!title) return;
+  await api('/api/study/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    title, category:document.getElementById('new-task-cat').value, priority:document.getElementById('new-task-pri').value
+  })});
+  document.getElementById('new-task-title').value = '';
+  loadTasks();
+}
+
+async function toggleTask(id, done) {
+  await api('/api/study/tasks/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:done?'done':'pending'})});
+  loadTasks();
+  loadPomodoroStats();
+}
+
+async function deleteTask(id) {
+  await api('/api/study/tasks/'+id, {method:'DELETE'});
+  loadTasks();
+}
+
+// ---- 番茄钟 ----
+let pomodoroTimer = null;
+let pomodoroSeconds = 25 * 60;
+let pomodoroRunning = false;
+let pomodoroStartTime = null;
+
+function updatePomodoroDisplay() {
+  const m = Math.floor(pomodoroSeconds / 60);
+  const s = pomodoroSeconds % 60;
+  document.getElementById('pomodoro-display').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function pomodoroStart() {
+  if (pomodoroRunning) return;
+  pomodoroRunning = true;
+  pomodoroStartTime = new Date().toISOString();
+  document.getElementById('pomodoro-status').textContent = '🍅 专注中...';
+  document.getElementById('btn-pomodoro-start').disabled = true;
+  document.getElementById('btn-pomodoro-pause').disabled = false;
+  document.getElementById('btn-pomodoro-stop').disabled = false;
+  pomodoroTimer = setInterval(() => {
+    pomodoroSeconds--;
+    updatePomodoroDisplay();
+    if (pomodoroSeconds <= 0) {
+      pomodoroComplete();
+    }
+  }, 1000);
+}
+
+function pomodoroPause() {
+  if (!pomodoroRunning) return;
+  pomodoroRunning = false;
+  clearInterval(pomodoroTimer);
+  document.getElementById('pomodoro-status').textContent = '⏸ 已暂停';
+  document.getElementById('btn-pomodoro-start').disabled = false;
+  document.getElementById('btn-pomodoro-pause').disabled = true;
+}
+
+function pomodoroStop() {
+  pomodoroRunning = false;
+  clearInterval(pomodoroTimer);
+  const elapsed = 25 * 60 - pomodoroSeconds;
+  if (elapsed >= 60) {
+    api('/api/study/pomodoro', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      task_title: document.getElementById('pomodoro-task').value || '未命名',
+      category: document.getElementById('pomodoro-cat').value,
+      duration_min: Math.round(elapsed / 60),
+      started_at: pomodoroStartTime,
+      completed: false,
+    })});
+  }
+  pomodoroSeconds = 25 * 60;
+  updatePomodoroDisplay();
+  document.getElementById('pomodoro-status').textContent = '准备开始';
+  document.getElementById('btn-pomodoro-start').disabled = false;
+  document.getElementById('btn-pomodoro-pause').disabled = true;
+  document.getElementById('btn-pomodoro-stop').disabled = true;
+  loadPomodoroStats();
+}
+
+async function pomodoroComplete() {
+  pomodoroRunning = false;
+  clearInterval(pomodoroTimer);
+  document.getElementById('pomodoro-status').textContent = '🎉 完成！休息一下';
+  document.getElementById('btn-pomodoro-start').disabled = false;
+  document.getElementById('btn-pomodoro-pause').disabled = true;
+  document.getElementById('btn-pomodoro-stop').disabled = true;
+  await api('/api/study/pomodoro', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    task_title: document.getElementById('pomodoro-task').value || '未命名',
+    category: document.getElementById('pomodoro-cat').value,
+    duration_min: 25,
+    started_at: pomodoroStartTime,
+    completed: true,
+  })});
+  pomodoroSeconds = 25 * 60;
+  updatePomodoroDisplay();
+  loadPomodoroStats();
+}
+
+async function loadPomodoroStats() {
+  const stats = await api('/api/study/pomodoro');
+  document.getElementById('stat-count').textContent = stats.today_count;
+  document.getElementById('stat-minutes').textContent = stats.today_minutes;
+  const catEmoji = {数学:'📐',英语:'📖',政治:'📕',专业课:'📗',其他:'📝'};
+  let breakdown = '';
+  for (const [cat, min] of Object.entries(stats.by_category || {})) {
+    breakdown += `<div style="margin:4px 0">${catEmoji[cat]||'📝'} ${cat}：${min} 分钟</div>`;
+  }
+  document.getElementById('stat-breakdown').innerHTML = breakdown || '今天还没有完成番茄钟';
+}
+
+// ---- AI 排课 ----
+async function genSchedule() {
+  const btn = document.getElementById('btn-schedule');
+  btn.disabled = true;
+  document.getElementById('schedule-status').innerHTML = '<div class="status info"><span class="spinner"></span> AI 正在排课...</div>';
+  const { task_id } = await api('/api/study/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    energy: document.getElementById('study-energy').value,
+    mood: document.getElementById('study-mood').value,
+    available_hours: parseInt(document.getElementById('study-hours').value),
+  })});
+  pollTask(task_id, 2000, (err, r) => {
+    btn.disabled = false;
+    document.getElementById('schedule-status').innerHTML = '';
+    if (err) { document.getElementById('schedule-result').innerHTML = `<div class="status error">排课失败：${esc(err)}</div>`; return; }
+    let h = '';
+    if (r.schedule?.length) {
+      h += '<div style="margin:12px 0">';
+      const catEmoji = {数学:'📐',英语:'📖',政治:'📕',专业课:'📗',其他:'📝'};
+      r.schedule.forEach(s => {
+        h += `<div style="display:flex;gap:12px;padding:10px;border-bottom:1px solid var(--border)"><span style="color:var(--blue);font-weight:500;min-width:120px">${esc(s.time)}</span><span>${catEmoji[s.category]||'📝'} ${esc(s.task)}</span><span style="color:var(--text2);font-size:12px;margin-left:auto">${esc(s.reason||'')}</span></div>`;
+      });
+      h += '</div>';
+    }
+    if (r.tips) h += `<div style="color:var(--green);padding:10px;background:#0d2818;border-radius:8px;margin:8px 0">💡 ${esc(r.tips)}</div>`;
+    if (r.energy_note) h += `<div style="color:var(--text2);font-size:13px;margin-top:8px">🔋 ${esc(r.energy_note)}</div>`;
+    document.getElementById('schedule-result').innerHTML = h;
+  });
+}
+
+// ---- 每日复盘 ----
+async function genReview() {
+  document.getElementById('review-status').innerHTML = '<div class="status info"><span class="spinner"></span> AI 正在生成复盘...</div>';
+  const { task_id } = await api('/api/study/review', {method:'POST'});
+  pollTask(task_id, 2000, (err, r) => {
+    document.getElementById('review-status').innerHTML = '';
+    if (err) { document.getElementById('review-result').innerHTML = `<div class="status error">复盘失败：${esc(err)}</div>`; return; }
+    let h = '<div class="card">';
+    if (r.summary) h += `<p style="font-size:16px;margin-bottom:12px">${esc(r.summary)}</p>`;
+    if (r.score) h += `<p><b>今日评分</b>：<span style="color:var(--blue);font-size:20px;font-weight:bold">${r.score}/10</span></p>`;
+    if (r.strengths?.length) h += `<p style="margin-top:8px"><b>✅ 做得好</b><ul>${r.strengths.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></p>`;
+    if (r.improvements?.length) h += `<p><b>🔄 可改进</b><ul>${r.improvements.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></p>`;
+    if (r.mood_analysis) h += `<p style="color:var(--text2);margin-top:8px">🧠 ${esc(r.mood_analysis)}</p>`;
+    if (r.tomorrow_suggestion) h += `<p style="color:var(--green);margin-top:12px;padding:10px;background:#0d2818;border-radius:8px">📅 明天建议：${esc(r.tomorrow_suggestion)}</p>`;
+    h += '</div>';
+    document.getElementById('review-result').innerHTML = h;
+  });
+}
+
+// ---- 考研驾驶舱初始化 ----
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', async () => {
+    if (t.dataset.tab === 'study' && !loaded.study) {
+      loaded.study = true;
+      loadTasks();
+      loadPomodoroStats();
+    }
+  });
+});
+</script>
+</body>
+</html>
