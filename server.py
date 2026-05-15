@@ -73,6 +73,26 @@ def api_summary():
     })
 
 
+@app.route("/api/debug")
+def api_debug():
+    """Debug endpoint to check vault contents"""
+    import os
+    vault_exists = os.path.isdir(VAULT_PATH)
+    vault_contents = os.listdir(VAULT_PATH) if vault_exists else []
+    diary_dir = os.path.join(VAULT_PATH, "01 日记")
+    diary_exists = os.path.isdir(diary_dir)
+    diary_files = os.listdir(diary_dir) if diary_exists else []
+    return jsonify({
+        "vault_path": VAULT_PATH,
+        "vault_exists": vault_exists,
+        "vault_contents": vault_contents[:20],
+        "diary_dir": diary_dir,
+        "diary_exists": diary_exists,
+        "diary_files": diary_files[:10],
+        "total_notes": summary["total_notes"],
+    })
+
+
 @app.route("/api/vault")
 def api_vault():
     folders = {}
