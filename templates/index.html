@@ -145,28 +145,65 @@ li { margin:4px 0; }
 .upload-box .skip { margin-top:16px; }
 .upload-box .skip a { color:var(--text2); font-size:13px; cursor:pointer; text-decoration:underline; }
 .upload-box .skip a:hover { color:var(--text); }
+.connect-card { background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:left; }
+.connect-card.success { border-color:var(--green); }
+.connect-card.error { border-color:var(--red); }
+.obsidian-status { position:fixed; top:8px; right:8px; z-index:100; display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; background:var(--bg2); border:1px solid var(--border); font-size:12px; color:var(--text2); cursor:pointer; }
+.obsidian-status.connected { border-color:var(--green); color:var(--green); }
+.obsidian-status:hover { background:var(--bg3); }
 </style>
 </head>
 <body>
 
-<!-- 上传遮罩 -->
+<!-- 连接/上传遮罩 -->
 <div id="upload-overlay" class="upload-overlay hidden">
   <div class="upload-box">
-    <h2>📂 选择你的 Obsidian 仓库</h2>
-    <p>上传你的 Obsidian 文件夹，AI 会读取并分析所有笔记</p>
-    <div class="upload-area" id="upload-area" onclick="document.getElementById('vault-input').click()">
-      <input type="file" id="vault-input" webkitdirectory multiple>
-      <div class="icon">📁</div>
-      <div class="text">点击选择文件夹，或拖拽到这里<br><b>选择你的 Obsidian 根目录</b></div>
+    <h2>🧠 连接你的 Obsidian</h2>
+    <p>选择数据源，AI 会读取并分析你的笔记</p>
+
+    <!-- 方式一：连接本地 Obsidian -->
+    <div id="connect-section">
+      <div class="connect-card" id="connect-card">
+        <h3 style="margin:0 0 12px;font-size:16px;">🔌 连接本地 Obsidian（推荐）</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px;">需要在 Obsidian 中安装「Local REST API」插件</p>
+        <div style="text-align:left;margin-bottom:12px;">
+          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API 地址</label>
+          <input type="text" id="obsidian-url" class="input" placeholder="http://127.0.0.1:27123" style="margin-bottom:10px;">
+          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API Key</label>
+          <input type="text" id="obsidian-key" class="input" placeholder="在 Obsidian 设置 → Local REST API 中找到">
+        </div>
+        <button class="btn primary" onclick="connectObsidian()" style="width:100%;margin-bottom:8px;" id="connect-btn">连接</button>
+        <div id="connect-status" style="font-size:13px;min-height:20px;"></div>
+      </div>
+
+      <div style="margin:16px 0;color:var(--text2);font-size:13px;">— 或者 —</div>
+
+      <!-- 方式二：上传文件夹 -->
+      <details class="expander">
+        <summary>📂 上传文件夹</summary>
+        <div class="content" style="padding:16px;">
+          <div class="upload-area" id="upload-area" onclick="document.getElementById('vault-input').click()" style="margin:0;">
+            <input type="file" id="vault-input" webkitdirectory multiple>
+            <div class="icon" style="font-size:36px;">📁</div>
+            <div class="text">点击选择文件夹，或拖拽到这里</div>
+          </div>
+          <div class="progress" id="upload-progress">
+            <div class="bar"><div class="fill" id="upload-fill"></div></div>
+            <div class="status" id="upload-status">上传中...</div>
+          </div>
+        </div>
+      </details>
     </div>
-    <div class="progress" id="upload-progress">
-      <div class="bar"><div class="fill" id="upload-fill"></div></div>
-      <div class="status" id="upload-status">上传中...</div>
-    </div>
+
     <div class="skip">
       <a onclick="skipUpload()">跳过，使用默认示例仓库</a>
     </div>
   </div>
+</div>
+
+<!-- Obsidian 连接状态 -->
+<div id="obsidian-indicator" class="obsidian-status hidden" onclick="toggleObsidianSettings()">
+  <span id="obsidian-dot">●</span> <span id="obsidian-label">未连接</span>
 </div>
 
 <!-- 手机端汉堡菜单（默认隐藏，JS 控制显示） -->
@@ -383,15 +420,20 @@ const uploadOverlay = document.getElementById('upload-overlay');
 const uploadArea = document.getElementById('upload-area');
 const vaultInput = document.getElementById('vault-input');
 
-// 检查是否已上传
+// 检查数据源：先试 Obsidian 连接，再试上传状态
 async function checkUploadStatus() {
+  // 1. 尝试已保存的 Obsidian 连接
+  const obsidianOk = await checkObsidianSaved();
+  if (obsidianOk) return;
+
+  // 2. 检查是否有上传的仓库
   try {
     const r = await api('/api/upload/status');
     if (!r.uploaded) {
       uploadOverlay.classList.remove('hidden');
     }
   } catch(e) {
-    // API 失败不阻塞
+    uploadOverlay.classList.remove('hidden');
   }
 }
 checkUploadStatus();
@@ -478,6 +520,178 @@ async function uploadFiles(files) {
 
 function skipUpload() {
   uploadOverlay.classList.add('hidden');
+}
+
+// ==================== Obsidian Local REST API 连接 ====================
+const OBSIDIAN_URL_KEY = 'obsidian_api_url';
+const OBSIDIAN_KEY_KEY = 'obsidian_api_key';
+
+function getObsidianConfig() {
+  return {
+    url: localStorage.getItem(OBSIDIAN_URL_KEY) || '',
+    key: localStorage.getItem(OBSIDIAN_KEY_KEY) || '',
+  };
+}
+
+function saveObsidianConfig(url, key) {
+  localStorage.setItem(OBSIDIAN_URL_KEY, url);
+  localStorage.setItem(OBSIDIAN_KEY_KEY, key);
+}
+
+function clearObsidianConfig() {
+  localStorage.removeItem(OBSIDIAN_URL_KEY);
+  localStorage.removeItem(OBSIDIAN_KEY_KEY);
+}
+
+async function obsidianFetch(path, opts = {}) {
+  const { url, key } = getObsidianConfig();
+  if (!url || !key) throw new Error('未配置 Obsidian 连接');
+  const headers = { 'Authorization': 'Bearer ' + key, ...(opts.headers || {}) };
+  const r = await fetch(url.replace(/\/$/, '') + path, { ...opts, headers });
+  if (!r.ok) throw new Error(`Obsidian API ${r.status}`);
+  return r;
+}
+
+async function testObsidianConnection(url, key) {
+  const r = await fetch(url.replace(/\/$/, '') + '/', {
+    headers: { 'Authorization': 'Bearer ' + key }
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+async function connectObsidian() {
+  const url = document.getElementById('obsidian-url').value.trim() || 'http://127.0.0.1:27123';
+  const key = document.getElementById('obsidian-key').value.trim();
+  const statusEl = document.getElementById('connect-status');
+  const card = document.getElementById('connect-card');
+  const btn = document.getElementById('connect-btn');
+
+  if (!key) {
+    statusEl.innerHTML = '<span style="color:var(--red)">请输入 API Key</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '连接中...';
+  statusEl.innerHTML = '<span style="color:var(--text2)">正在测试连接...</span>';
+
+  try {
+    const info = await testObsidianConnection(url, key);
+    saveObsidianConfig(url, key);
+    card.classList.add('success');
+    statusEl.innerHTML = `<span style="color:var(--green)">✓ 已连接到 ${info.manifest?.name || 'Obsidian'} v${info.versions?.obsidian || ''}</span>`;
+    setTimeout(() => {
+      uploadOverlay.classList.add('hidden');
+      initObsidianMode();
+    }, 800);
+  } catch(e) {
+    card.classList.add('error');
+    statusEl.innerHTML = `<span style="color:var(--red)">连接失败：${e.message}<br>请确认插件已启用且 HTTP 服务器已开启</span>`;
+    setTimeout(() => card.classList.remove('error'), 3000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '连接';
+  }
+}
+
+function toggleObsidianSettings() {
+  uploadOverlay.classList.toggle('hidden');
+  if (!uploadOverlay.classList.contains('hidden')) {
+    const { url, key } = getObsidianConfig();
+    if (url) document.getElementById('obsidian-url').value = url;
+    if (key) document.getElementById('obsidian-key').value = key;
+  }
+}
+
+// 从 Obsidian 递归读取所有 .md 文件
+async function obsidianListFiles(path = '') {
+  const data = await obsidianFetch('/vault/' + path).then(r => r.json());
+  let files = [];
+  for (const item of (data.files || [])) {
+    if (item.endsWith('/')) {
+      const sub = await obsidianListFiles(path + item);
+      files = files.concat(sub);
+    } else if (item.endsWith('.md')) {
+      files.push(path + item);
+    }
+  }
+  return files;
+}
+
+async function obsidianReadFile(path) {
+  const r = await obsidianFetch('/vault/' + encodeURIComponent(path), {
+    headers: { 'Accept': 'application/vnd.olrapi.note+json' }
+  });
+  return r.json();
+}
+
+// 初始化 Obsidian 模式：替换侧边栏和数据源
+let obsidianNotes = [];
+let obsidianConnected = false;
+
+async function initObsidianMode() {
+  const indicator = document.getElementById('obsidian-indicator');
+  indicator.classList.remove('hidden');
+  indicator.classList.add('connected');
+  document.getElementById('obsidian-dot').textContent = '●';
+  document.getElementById('obsidian-label').textContent = 'Obsidian 已连接';
+  obsidianConnected = true;
+
+  // 加载笔记列表
+  try {
+    const files = await obsidianListFiles();
+    obsidianNotes = [];
+
+    const folders = {};
+    for (const f of files) {
+      const parts = f.split('/');
+      const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '(根目录)';
+      if (!folders[folder]) folders[folder] = 0;
+      folders[folder]++;
+    }
+
+    // 更新侧边栏
+    let h = `<div class="stat"><b>笔记总数</b>：${files.length} 篇</div><hr style="border-color:var(--border);margin:10px 0">`;
+    for (const [f, c] of Object.entries(folders)) h += `<div class="folder">📁 ${f}：${c} 篇</div>`;
+    document.getElementById('sidebar-stats').innerHTML = h;
+
+    // 读取所有笔记内容（用于 AI 分析）
+    let loaded = 0;
+    for (const f of files) {
+      try {
+        const note = await obsidianReadFile(f);
+        obsidianNotes.push({ path: f, title: f.split('/').pop().replace('.md',''), content: note.content || '', date: extractDate(f) });
+      } catch(e) { /* 跳过读取失败的文件 */ }
+      loaded++;
+      document.getElementById('obsidian-label').textContent = `加载中 ${loaded}/${files.length}`;
+    }
+    document.getElementById('obsidian-label').textContent = `Obsidian · ${files.length} 篇`;
+
+  } catch(e) {
+    document.getElementById('obsidian-label').textContent = '读取失败';
+    console.error('Obsidian load error:', e);
+  }
+}
+
+function extractDate(path) {
+  const m = path.match(/(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+
+// 页面加载时检查已保存的 Obsidian 连接
+async function checkObsidianSaved() {
+  const { url, key } = getObsidianConfig();
+  if (!url || !key) return false;
+  try {
+    await testObsidianConnection(url, key);
+    initObsidianMode();
+    return true;
+  } catch(e) {
+    // 连接失败，清除配置
+    clearObsidianConfig();
+    return false;
+  }
 }
 
 // ---- 响应式侧边栏（纯 JS，不依赖 CSS media query）----
@@ -603,7 +817,13 @@ async function sendChat() {
   addBubble('user', esc(msg));
   addThinking();
 
-  const { task_id } = await api('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg}) });
+  const body = { message: msg };
+  // 如果 Obsidian 已连接，附带笔记上下文
+  if (obsidianConnected && obsidianNotes.length) {
+    body.notes_context = obsidianNotes.slice(0, 50).map(n => `## ${n.title}\n${n.content.slice(0, 500)}`).join('\n\n');
+  }
+
+  const { task_id } = await api('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
   pollTask(task_id, 1000, (err, result) => {
     document.getElementById('chat-thinking')?.remove();
     if (err) addBubble('ai', `<span style="color:var(--red)">出错了：${esc(err)}</span>`);
@@ -629,24 +849,44 @@ async function doSearch() {
   document.getElementById('search-status').innerHTML = '<div class="status info"><span class="spinner"></span> 正在搜索...</div>';
   document.getElementById('search-result').innerHTML = '';
 
-  const { task_id } = await api('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q}) });
-  pollTask(task_id, 2000, (err, r) => {
+  if (obsidianConnected) {
+    // 客户端搜索 Obsidian 笔记
+    const ql = q.toLowerCase();
+    const matches = obsidianNotes.filter(n =>
+      n.title.toLowerCase().includes(ql) || n.content.toLowerCase().includes(ql)
+    ).slice(0, 10);
     document.getElementById('search-status').innerHTML = '';
-    if (err) { document.getElementById('search-result').innerHTML = `<div class="status error">搜索失败：${esc(err)}</div>`; return; }
+    if (!matches.length) {
+      document.getElementById('search-result').innerHTML = '<div class="card">没有找到相关内容</div>';
+      return;
+    }
+    let h = `<h3>📄 找到 ${matches.length} 篇相关笔记</h3>`;
+    matches.forEach(n => {
+      const idx = n.content.toLowerCase().indexOf(ql);
+      const excerpt = idx >= 0 ? n.content.slice(Math.max(0, idx - 40), idx + 100) : n.content.slice(0, 100);
+      h += `<div class="search-result"><b>${esc(n.title)}</b>${n.date?` <span style="color:var(--text2);font-size:12px">${esc(n.date)}</span>`:''}<p style="margin-top:6px;color:var(--text2);font-size:13px">${esc(excerpt)}...</p></div>`;
+    });
+    document.getElementById('search-result').innerHTML = h;
+  } else {
+    const { task_id } = await api('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q}) });
+    pollTask(task_id, 2000, (err, r) => {
+      document.getElementById('search-status').innerHTML = '';
+      if (err) { document.getElementById('search-result').innerHTML = `<div class="status error">搜索失败：${esc(err)}</div>`; return; }
 
-    let h = '';
-    if (r.answer) h += `<div class="card"><h3>💬 回答</h3><p>${r.answer}</p></div>`;
-    if (r.relevant_notes?.length) {
-      h += `<h3>📄 相关笔记</h3>`;
-      r.relevant_notes.forEach(n => {
-        h += `<div class="search-result"><b>${esc(n.title||'未知')}</b>${n.date?` <span style="color:var(--text2);font-size:12px">${esc(n.date)}</span>`:''}<p style="margin-top:6px;color:var(--text2);font-size:13px">${esc(n.excerpt||'')}</p></div>`;
-      });
-    }
-    if (r.insights?.length) {
-      h += `<h3>🔗 发现的规律</h3><ul>${r.insights.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
-    }
-    document.getElementById('search-result').innerHTML = h || '<div class="card">没有找到相关内容</div>';
-  });
+      let h = '';
+      if (r.answer) h += `<div class="card"><h3>💬 回答</h3><p>${r.answer}</p></div>`;
+      if (r.relevant_notes?.length) {
+        h += `<h3>📄 相关笔记</h3>`;
+        r.relevant_notes.forEach(n => {
+          h += `<div class="search-result"><b>${esc(n.title||'未知')}</b>${n.date?` <span style="color:var(--text2);font-size:12px">${esc(n.date)}</span>`:''}<p style="margin-top:6px;color:var(--text2);font-size:13px">${esc(n.excerpt||'')}</p></div>`;
+        });
+      }
+      if (r.insights?.length) {
+        h += `<h3>🔗 发现的规律</h3><ul>${r.insights.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
+      }
+      document.getElementById('search-result').innerHTML = h || '<div class="card">没有找到相关内容</div>';
+    });
+  }
 }
 
 // ---- 人格画像 ----
@@ -680,7 +920,12 @@ async function genProfile() {
 
 // ---- 日记分析 ----
 async function loadDiaryList() {
-  const diaries = await api('/api/diaries');
+  let diaries;
+  if (obsidianConnected) {
+    diaries = obsidianNotes.filter(n => n.date && n.path.includes('日记')).map(n => ({ date: n.date, title: n.title }));
+  } else {
+    diaries = await api('/api/diaries');
+  }
   const sel = document.getElementById('diary-select');
   sel.innerHTML = diaries.map(d => `<option value="${d.date}">${d.date} ${d.title}</option>`).join('');
   if (diaries.length) loadDiary();
@@ -688,9 +933,15 @@ async function loadDiaryList() {
 
 async function loadDiary() {
   const date = document.getElementById('diary-select').value;
-  const d = await api('/api/diary/' + date);
-  document.getElementById('diary-content').value = d.content;
-  document.getElementById('diary-result').innerHTML = d.existing_summary ? `<div class="card">${d.existing_summary}</div>` : '';
+  if (obsidianConnected) {
+    const note = obsidianNotes.find(n => n.date === date);
+    document.getElementById('diary-content').value = note ? note.content : '未找到';
+    document.getElementById('diary-result').innerHTML = '';
+  } else {
+    const d = await api('/api/diary/' + date);
+    document.getElementById('diary-content').value = d.content;
+    document.getElementById('diary-result').innerHTML = d.existing_summary ? `<div class="card">${d.existing_summary}</div>` : '';
+  }
 }
 
 async function analyzeDiary() {
@@ -698,7 +949,17 @@ async function analyzeDiary() {
   const btn = document.getElementById('btn-diary');
   btn.disabled = true;
   document.getElementById('diary-status').innerHTML = '<div class="status info"><span class="spinner"></span> 分析中...</div>';
-  const { task_id } = await api('/api/diary/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({date}) });
+
+  let task_id;
+  if (obsidianConnected) {
+    const note = obsidianNotes.find(n => n.date === date);
+    const content = note ? note.content : '';
+    const res = await api('/api/diary/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({date, content}) });
+    task_id = res.task_id;
+  } else {
+    const res = await api('/api/diary/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({date}) });
+    task_id = res.task_id;
+  }
   pollTask(task_id, 1500, (err, r) => {
     btn.disabled = false;
     document.getElementById('diary-status').innerHTML = '';
@@ -776,7 +1037,17 @@ async function genTimeline() {
 
 // ---- 仓库概览 ----
 async function loadVault() {
-  const data = await api('/api/vault');
+  let data;
+  if (obsidianConnected) {
+    data = {};
+    obsidianNotes.forEach(n => {
+      const folder = n.path.split('/').length > 1 ? n.path.split('/').slice(0, -1).join('/') : '(根目录)';
+      if (!data[folder]) data[folder] = [];
+      data[folder].push({ title: n.title, preview: n.content.slice(0, 120).replace(/\n/g, ' '), date: n.date });
+    });
+  } else {
+    data = await api('/api/vault');
+  }
   let h = '';
   for (const [folder, notes] of Object.entries(data)) {
     h += `<details class="expander"><summary>📁 ${esc(folder)} (${notes.length} 篇)</summary><div class="content">`;

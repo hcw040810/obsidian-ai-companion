@@ -93,13 +93,15 @@ def build_chat_context(notes: list[Note], max_chars: int = 20000) -> str:
     return "".join(parts)
 
 
-def chat(user_message: str, chat_history: list[dict], notes: list[Note] | None = None) -> str:
+def chat(user_message: str, chat_history: list[dict], notes: list[Note] | None = None, notes_context: str | None = None) -> str:
     """单轮对话 — 每次调用都重新扫描仓库以获取最新内容"""
-    # 每次对话都重新扫描，确保读取最新笔记
-    if notes is None:
-        notes = scan_vault()
-
-    user_context = build_chat_context(notes)
+    # 优先使用前端传来的笔记上下文（Obsidian 模式）
+    if notes_context:
+        user_context = notes_context[:20000]
+    else:
+        if notes is None:
+            notes = scan_vault()
+        user_context = build_chat_context(notes)
 
     history_text = ""
     for msg in chat_history[-20:]:

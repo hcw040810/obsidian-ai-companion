@@ -149,12 +149,12 @@ def api_diary(date):
 def api_chat():
     data = request.json
     msg = data.get("message", "")
+    notes_ctx = data.get("notes_context")  # 前端从 Obsidian 传来的笔记内容
     if not msg:
         return jsonify({"error": "empty message"}), 400
     chat_history.append({"role": "user", "content": msg})
-    # 每次对话都重新扫描仓库，确保读取最新笔记
     fresh_notes = get_user_notes()
-    tid = start_bg(chat, msg, list(chat_history), fresh_notes)
+    tid = start_bg(chat, msg, list(chat_history), fresh_notes, notes_ctx)
     return jsonify({"task_id": tid})
 
 
@@ -186,6 +186,11 @@ def api_profile_gen():
 def api_diary_analyze():
     data = request.json
     date = data.get("date", "")
+    content = data.get("content")  # 前端直接传内容（Obsidian 模式）
+    if content:
+        # Obsidian 模式：使用前端传来的日记内容
+        tid = start_bg(analyze_diary, content, "")
+        return jsonify({"task_id": tid})
     diaries = get_diaries(get_user_vault_path())
     entry = next((d for d in diaries if d.date == date), None)
     if not entry:
