@@ -8,6 +8,8 @@ services:
     envVars:
       - key: MIMO_API_KEY
         sync: false
+      - key: SECRET_KEY
+        generateValue: true
       - key: MIMO_BASE_URL
         value: https://token-plan-cn.xiaomimimo.com/v1
       - key: MIMO_MODEL

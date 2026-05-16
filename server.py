@@ -3,9 +3,10 @@ import threading
 import uuid
 import json
 import os
+import shutil
 from datetime import datetime, date
-from flask import Flask, render_template, request, jsonify
-from config import VAULT_PATH
+from flask import Flask, render_template, request, jsonify, session
+from config import VAULT_PATH, SECRET_KEY
 from reader import scan_vault, get_all_content_summary, get_diaries
 from analyzer import analyze_diary
 from summarizer import format_summary
@@ -16,12 +17,17 @@ from timeline import generate_timeline_report
 from search import search_notes
 
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
 
 # ---- 考研驾驶舱数据持久化 ----
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 STUDY_TASKS_FILE = os.path.join(DATA_DIR, "study_tasks.json")
 POMODORO_LOG_FILE = os.path.join(DATA_DIR, "pomodoro_log.json")
+
+# 用户上传目录
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def load_json(path, default):
@@ -35,13 +41,31 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-app = Flask(__name__)
-
 # 全局数据
-notes = scan_vault()
-summary = get_all_content_summary()
+_default_notes = scan_vault()
+_default_summary = get_all_content_summary()
 tasks = {}  # tid -> {"s": status, "r": result, "e": error}
 chat_history = []
+
+
+def get_user_vault_path():
+    """获取当前用户的仓库路径"""
+    sid = session.get("vault_session")
+    if sid:
+        user_vault = os.path.join(UPLOAD_DIR, sid)
+        if os.path.isdir(user_vault):
+            return user_vault
+    return VAULT_PATH
+
+
+def get_user_notes():
+    """获取当前用户的笔记"""
+    return scan_vault(get_user_vault_path())
+
+
+def get_user_summary():
+    """获取当前用户的仓库概况"""
+    return get_all_content_summary(get_user_vault_path())
 
 
 def start_bg(func, *args):
@@ -66,37 +90,38 @@ def index():
 
 @app.route("/api/summary")
 def api_summary():
+    s = get_user_summary()
     return jsonify({
-        "total": summary["total_notes"],
-        "folders": summary["folders"],
-        "vault_path": VAULT_PATH,
+        "total": s["total_notes"],
+        "folders": s["folders"],
+        "vault_path": get_user_vault_path(),
     })
 
 
 @app.route("/api/debug")
 def api_debug():
     """Debug endpoint to check vault contents"""
-    import os
-    vault_exists = os.path.isdir(VAULT_PATH)
-    vault_contents = os.listdir(VAULT_PATH) if vault_exists else []
-    diary_dir = os.path.join(VAULT_PATH, "01 日记")
+    vault_path = get_user_vault_path()
+    vault_exists = os.path.isdir(vault_path)
+    vault_contents = os.listdir(vault_path) if vault_exists else []
+    diary_dir = os.path.join(vault_path, "01 日记")
     diary_exists = os.path.isdir(diary_dir)
     diary_files = os.listdir(diary_dir) if diary_exists else []
     return jsonify({
-        "vault_path": VAULT_PATH,
+        "vault_path": vault_path,
         "vault_exists": vault_exists,
         "vault_contents": vault_contents[:20],
         "diary_dir": diary_dir,
         "diary_exists": diary_exists,
         "diary_files": diary_files[:10],
-        "total_notes": summary["total_notes"],
+        "total_notes": get_user_summary()["total_notes"],
     })
 
 
 @app.route("/api/vault")
 def api_vault():
     folders = {}
-    for n in notes:
+    for n in get_user_notes():
         f = n.folder or "(根目录)"
         if f not in folders:
             folders[f] = []
@@ -106,13 +131,13 @@ def api_vault():
 
 @app.route("/api/diaries")
 def api_diaries():
-    diaries = get_diaries()
+    diaries = get_diaries(get_user_vault_path())
     return jsonify([{"date": d.date, "title": d.title, "content": d.content[:500]} for d in diaries])
 
 
 @app.route("/api/diary/<date>")
 def api_diary(date):
-    diaries = get_diaries()
+    diaries = get_diaries(get_user_vault_path())
     entry = next((d for d in diaries if d.date == date), None)
     if not entry:
         return jsonify({"error": "not found"}), 404
@@ -128,7 +153,7 @@ def api_chat():
         return jsonify({"error": "empty message"}), 400
     chat_history.append({"role": "user", "content": msg})
     # 每次对话都重新扫描仓库，确保读取最新笔记
-    fresh_notes = scan_vault()
+    fresh_notes = get_user_notes()
     tid = start_bg(chat, msg, list(chat_history), fresh_notes)
     return jsonify({"task_id": tid})
 
@@ -136,10 +161,8 @@ def api_chat():
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
     """手动刷新仓库数据"""
-    global notes, summary
-    notes = scan_vault()
-    summary = get_all_content_summary()
-    return jsonify({"ok": True, "total": summary["total_notes"]})
+    s = get_user_summary()
+    return jsonify({"ok": True, "total": s["total_notes"]})
 
 
 @app.route("/api/chat/history")
@@ -155,7 +178,7 @@ def api_chat_clear():
 
 @app.route("/api/profile/generate", methods=["POST"])
 def api_profile_gen():
-    tid = start_bg(generate_profile, notes)
+    tid = start_bg(generate_profile, get_user_notes())
     return jsonify({"task_id": tid})
 
 
@@ -163,7 +186,7 @@ def api_profile_gen():
 def api_diary_analyze():
     data = request.json
     date = data.get("date", "")
-    diaries = get_diaries()
+    diaries = get_diaries(get_user_vault_path())
     entry = next((d for d in diaries if d.date == date), None)
     if not entry:
         return jsonify({"error": "not found"}), 404
@@ -179,7 +202,7 @@ def api_diary_analyze():
 
 @app.route("/api/timeline/generate", methods=["POST"])
 def api_timeline_gen():
-    diaries = get_diaries()
+    diaries = get_diaries(get_user_vault_path())
     tid = start_bg(generate_timeline_report, diaries)
     return jsonify({"task_id": tid})
 
@@ -190,8 +213,79 @@ def api_search():
     query = data.get("query", "")
     if not query:
         return jsonify({"error": "empty query"}), 400
-    tid = start_bg(search_notes, query, notes)
+    tid = start_bg(search_notes, query, get_user_notes())
     return jsonify({"task_id": tid})
+
+
+# ==================== 仓库上传 API ====================
+
+@app.route("/api/upload/status")
+def api_upload_status():
+    """检查用户是否已上传仓库"""
+    sid = session.get("vault_session")
+    has_upload = False
+    note_count = 0
+    if sid:
+        user_vault = os.path.join(UPLOAD_DIR, sid)
+        if os.path.isdir(user_vault):
+            has_upload = True
+            note_count = len([f for f in os.listdir(user_vault) if f.endswith(".md")])
+    return jsonify({
+        "uploaded": has_upload,
+        "session_id": sid,
+        "note_count": note_count,
+        "default_vault": VAULT_PATH,
+    })
+
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    """接收用户上传的 Obsidian 仓库文件"""
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"error": "没有文件"}), 400
+
+    # 生成或复用 session id
+    sid = session.get("vault_session")
+    if not sid:
+        sid = str(uuid.uuid4())[:8]
+        session["vault_session"] = sid
+
+    user_vault = os.path.join(UPLOAD_DIR, sid)
+
+    # 如果已有旧数据，先清除
+    if os.path.isdir(user_vault):
+        shutil.rmtree(user_vault)
+    os.makedirs(user_vault, exist_ok=True)
+
+    saved = 0
+    for f in files:
+        # webkitdirectory 会把相对路径放在 filename 里
+        rel_path = f.filename
+        if not rel_path.endswith(".md"):
+            continue
+        # 跳过 .obsidian 等隐藏目录
+        parts = rel_path.replace("\\", "/").split("/")
+        if any(p.startswith(".") for p in parts):
+            continue
+        path = os.path.join(user_vault, rel_path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        f.save(path)
+        saved += 1
+
+    return jsonify({"ok": True, "count": saved, "session_id": sid})
+
+
+@app.route("/api/upload/reset", methods=["POST"])
+def api_upload_reset():
+    """清除上传数据，重新开始"""
+    sid = session.get("vault_session")
+    if sid:
+        user_vault = os.path.join(UPLOAD_DIR, sid)
+        if os.path.isdir(user_vault):
+            shutil.rmtree(user_vault)
+        session.pop("vault_session", None)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/task/<tid>")
@@ -417,5 +511,5 @@ def api_study_review():
 if __name__ == "__main__":
     print(f"启动服务器... http://localhost:5000")
     print(f"Vault: {VAULT_PATH}")
-    print(f"笔记: {summary['total_notes']} 篇")
+    print(f"笔记: {_default_summary['total_notes']} 篇")
     app.run(host="0.0.0.0", port=5000, debug=False)

@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Flask session 密钥
+SECRET_KEY = os.getenv("SECRET_KEY", "obsidian-ai-companion-default-key")
+
 # mimo API 配置
 MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
 MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://api.mimo.com/v1")
