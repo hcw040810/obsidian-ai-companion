@@ -124,6 +124,4 @@ obsidian-ai-companion/
 - **AI**: mimo API（兼容 OpenAI 格式）
 - **部署**: Render / Gunicorn
 
-## License
 
-MIT
