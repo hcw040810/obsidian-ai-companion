@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🧠 观察者 - Obsidian AI Companion</title>
+<meta name="theme-color" content="#0e1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="观察者">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -1247,6 +1253,57 @@ document.querySelectorAll('.tab').forEach(t => {
       loadPomodoroStats();
     }
   });
+});
+</script>
+
+<!-- PWA 安装提示 -->
+<div id="pwa-install-banner" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10001;background:var(--bg2);border:1px solid var(--blue);border-radius:12px;padding:14px 20px;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.4);max-width:90vw;">
+  <span style="font-size:20px;">📲</span>
+  <div>
+    <div style="font-size:14px;font-weight:500;">安装「观察者」到桌面</div>
+    <div style="font-size:12px;color:var(--text2);">像 App 一样使用，无需打开浏览器</div>
+  </div>
+  <button class="btn primary" id="pwa-install-btn" style="white-space:nowrap;">安装</button>
+  <button class="btn" id="pwa-dismiss-btn" style="padding:6px 10px;">✕</button>
+</div>
+
+<script>
+// ==================== PWA ====================
+// 注册 Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// 安装提示
+let deferredPrompt = null;
+const installBanner = document.getElementById('pwa-install-banner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBanner.style.display = 'flex';
+});
+
+document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  console.log('Install outcome:', outcome);
+  deferredPrompt = null;
+  installBanner.style.display = 'none';
+});
+
+document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
+  installBanner.style.display = 'none';
+});
+
+window.addEventListener('appinstalled', () => {
+  installBanner.style.display = 'none';
+  deferredPrompt = null;
 });
 </script>
 </body>
