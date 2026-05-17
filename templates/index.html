@@ -842,9 +842,6 @@ api('/api/summary').then(s => {
   document.getElementById('sidebar-stats').innerHTML = h;
 });
 
-// 加载仪表盘
-loadDashboard();
-
 let loaded = {};
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', async () => {
@@ -1484,6 +1481,9 @@ document.addEventListener('click', (e) => {
     panel.classList.remove('show');
   }
 });
+
+// 加载仪表盘
+loadDashboard();
 
 // ==================== PWA ====================
 // 注册 Service Worker

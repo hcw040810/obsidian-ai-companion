@@ -1,5 +1,5 @@
 // 观察者 Service Worker
-const CACHE_NAME = 'observer-v1';
+const CACHE_NAME = 'observer-v2';
 const STATIC_ASSETS = [
   '/',
   '/static/manifest.json',
