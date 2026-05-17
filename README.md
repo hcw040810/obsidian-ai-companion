@@ -1,127 +1,78 @@
-# 观察者 — Obsidian AI Companion
+# 🧠 观察者
 
-一个基于 Obsidian 笔记的 AI 心理陪伴助手。它会阅读你在 Obsidian 中的所有笔记（日记、灵感、随记等），通过 AI 分析你的情绪模式、行为规律，成为一个真正"认识"你的陪伴者。
+**你的第二大脑，真正认识你的 AI 伴侣。**
 
-## 功能
+观察者连接你的 Obsidian 笔记库，阅读你写过的每一句话——日记、灵感、随记、和 AI 的聊天记录。它不只是聊天，而是基于你完整的人生上下文，理解你的情绪、发现你的规律、陪你走过每一天。
 
-- **AI 对话** — 基于你的完整笔记上下文进行深度对话，能引用你写过的原话
-- **日记分析** — 自动分析日记的情绪、学习状态、压力来源
-- **情绪时间轴** — 可视化你的情绪变化趋势
-- **人格画像** — 从笔记中提炼你的性格特征和行为模式
-- **笔记搜索** — 智能搜索所有笔记内容
-- **考研驾驶舱** — 番茄钟、任务管理、每日学习计划和复盘
+---
 
-## 数据源支持
+## 它能做什么
 
-| 方式 | 说明 | 适用场景 |
-|------|------|----------|
-| **Obsidian 插件连接** | 通过 Local REST API 插件直连本地 Obsidian | 电脑/手机（同一局域网） |
-| **文件夹上传** | 在网页中上传 Obsidian 文件夹 | 任何设备 |
-| **默认仓库** | 使用项目内置的示例 vault | 演示/测试 |
+**💬 和你聊天** — 不是通用 AI，而是读过你所有笔记的专属伙伴。它记得你上周焦虑的事、你三个月前立下的目标、你反复出现的情绪模式。
 
-## 快速开始
+**📊 分析你的日记** — 自动识别情绪状态、学习效率、压力来源。告诉你今天的自己是什么状态，为什么会有这种感觉。
 
-### 1. 安装依赖
+**📈 情绪时间轴** — 用图表展示你长期的情绪波动。发现什么让你开心、什么让你焦虑、你的情绪有没有周期性规律。
 
-```bash
-pip install -r requirements.txt
-```
+**🔮 人格画像** — 从你的全部笔记中提炼出性格特征、价值观、行为模式、情绪触发点。你可能比你自己更了解自己。
 
-### 2. 配置环境变量
+**🔍 搜索回忆** — 用自然语言搜索你的过去。"我上个月为什么焦虑？""我什么时候进入过心流状态？""我最害怕什么？"
 
-复制 `.env.example` 为 `.env`，填入你的 API Key：
+**📚 考研驾驶舱** — 番茄钟、任务管理、AI 智能排课。根据你的精力和情绪状态，帮你安排今天该学什么。
 
-```bash
-cp .env.example .env
-```
+---
 
-需要配置：
-- `MIMO_API_KEY` — AI 模型的 API Key
+## 怎么用
 
-### 3. 启动
+### 方式一：直接访问在线版
 
-```bash
-python server.py
-```
+> [点击打开观察者](https://obsidian-ai-companion.onrender.com)
 
-打开 http://localhost:5000
+首次打开会让你选择数据源。你可以：
 
-## 连接 Obsidian（推荐）
+- **🔌 连接本地 Obsidian**（推荐）— 在 Obsidian 中安装 [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) 插件，网页会直连你的笔记库，实时读取最新内容
+- **📂 上传文件夹** — 直接上传你的 Obsidian 文件夹，适合手机或无法安装插件的场景
+- **⏭️ 使用示例仓库** — 先体验功能，再决定是否连接自己的笔记
 
-1. 在 Obsidian 中安装社区插件 **"Local REST API"**
-2. 启用插件的 HTTP 服务器（设置 → Local REST API → Enable HTTP server）
-3. 复制插件设置中的 API Key
-4. 在网页的连接界面中填入地址和 Key
+### 方式二：手机使用
 
-默认地址：`http://127.0.0.1:27123`
-
-### 手机使用
-
-手机和电脑连接同一 WiFi，在连接界面填入电脑的局域网 IP：
+手机和电脑连同一个 WiFi，在连接界面填入电脑的局域网 IP：
 
 ```
 http://192.168.x.x:27123
 ```
 
-## 部署到 Render
+### 方式三：自己部署
 
-项目已配置 `render.yaml`，可以直接部署：
-
-1. Fork 本仓库
-2. 在 [Render](https://render.com) 创建 Web Service
-3. 连接你的 GitHub 仓库
-4. 设置环境变量 `MIMO_API_KEY`
-5. 部署
-
-注意：Render 免费版会在闲置 15 分钟后休眠，首次访问需等待 50 秒左右冷启动。
-
-## 项目结构
-
-```
-obsidian-ai-companion/
-├── server.py          # Flask 后端主文件，所有 API 路由
-├── chat.py            # AI 对话模块
-├── analyzer.py        # 日记情绪分析
-├── profile.py         # 人格画像生成
-├── search.py          # 笔记搜索
-├── timeline.py        # 情绪时间轴
-├── reader.py          # Obsidian 笔记读取器
-├── writer.py          # 日记总结写入
-├── summarizer.py      # 内容摘要
-├── config.py          # 配置管理
-├── templates/
-│   └── index.html     # 前端单页应用
-├── vault/             # 示例 Obsidian 仓库
-├── requirements.txt   # Python 依赖
-├── Procfile           # Render/Heroku 部署配置
-├── render.yaml        # Render 服务配置
-└── .env.example       # 环境变量模板
+```bash
+git clone https://github.com/hcw040810/obsidian-ai-companion.git
+cd obsidian-ai-companion
+pip install -r requirements.txt
+cp .env.example .env
+# 编辑 .env，填入你的 MIMO_API_KEY
+python server.py
 ```
 
-## API 接口
+打开 http://localhost:5000
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/summary` | GET | 仓库概况（笔记数量、文件夹） |
-| `/api/vault` | GET | 笔记列表（按文件夹分组） |
-| `/api/diaries` | GET | 日记列表 |
-| `/api/diary/<date>` | GET | 指定日期日记内容 |
-| `/api/chat` | POST | AI 对话 |
-| `/api/diary/analyze` | POST | 日记情绪分析 |
-| `/api/profile/generate` | POST | 生成人格画像 |
-| `/api/timeline/generate` | POST | 生成情绪时间轴 |
-| `/api/search` | POST | 搜索笔记 |
-| `/api/upload` | POST | 上传 Obsidian 文件夹 |
-| `/api/upload/status` | GET | 上传状态检查 |
-| `/api/study/tasks` | GET/POST | 考研任务管理 |
-| `/api/study/pomodoro` | GET/POST | 番茄钟记录 |
-| `/api/study/schedule` | POST | AI 学习计划 |
+---
 
-## 技术栈
+## 为什么是 Obsidian
 
-- **后端**: Python + Flask + OpenAI SDK
-- **前端**: 原生 HTML/CSS/JS（单文件）
-- **AI**: mimo API（兼容 OpenAI 格式）
-- **部署**: Render / Gunicorn
+Obsidian 是本地优先的笔记工具，你的数据只存在你自己的设备上。观察者不存储你的笔记内容，只在你主动连接或上传时临时读取。断开连接后，数据即清除。
 
+---
 
+## 技术实现
+
+- **后端**: Python + Flask + Gunicorn
+- **前端**: 单页应用（原生 HTML/CSS/JS）
+- **AI**: mimo v2.5（OpenAI 兼容接口）
+- **笔记读取**: Obsidian Local REST API 插件 / 文件夹上传
+- **部署**: Render（免费方案）
+
+---
+
+## 开源协议
+
+MIT License
