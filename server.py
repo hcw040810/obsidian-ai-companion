@@ -293,6 +293,153 @@ def api_upload_reset():
     return jsonify({"ok": True})
 
 
+# ==================== 快速记录 API ====================
+
+FOLDER_MAP = {
+    "日记": "01 日记",
+    "灵感": "02 灵感，想法，随记",
+    "待办": "02 灵感，想法，随记",
+    "知识": "03 收集知识（未查证）",
+}
+
+
+@app.route("/api/notes/classify", methods=["POST"])
+def api_classify_note():
+    """AI 自动分类笔记内容"""
+    data = request.json
+    content = data.get("content", "").strip()
+    if not content:
+        return jsonify({"error": "empty content"}), 400
+
+    def _classify():
+        from openai import OpenAI
+        from config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL
+        prompt = f"""判断以下文字属于哪个分类，只返回 JSON。
+
+分类选项：
+- 日记：情绪、感受、今日记录、心情
+- 灵感：想法、创意、随记、观点
+- 待办：任务、计划、要做的事
+- 知识：学到的东西、收集的信息、笔记
+
+文字内容：
+{content[:500]}
+
+只返回 JSON：{{"category": "分类名", "title": "建议标题（10字以内）"}}"""
+
+        client = OpenAI(api_key=MIMO_API_KEY, base_url=MIMO_BASE_URL)
+        resp = client.chat.completions.create(
+            model=MIMO_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=100,
+        )
+        text = resp.choices[0].message.content.strip()
+        # 清理 markdown 代码块
+        if "```" in text:
+            parts = text.split("```")
+            text = parts[1] if len(parts) > 1 else parts[0]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        # 提取 JSON
+        import re
+        m = re.search(r'\{[^}]+\}', text)
+        if m:
+            text = m.group()
+        result = json.loads(text)
+        valid_cats = ["日记", "灵感", "待办", "知识"]
+        if result.get("category") not in valid_cats:
+            result["category"] = "灵感"
+        if not result.get("title"):
+            result["title"] = content[:10].replace("\n", " ")
+        return result
+
+    tid = start_bg(_classify)
+    return jsonify({"task_id": tid})
+
+
+@app.route("/api/notes/create", methods=["POST"])
+def api_create_note():
+    """创建新笔记"""
+    data = request.json
+    content = data.get("content", "").strip()
+    title = data.get("title", "").strip()
+    category = data.get("category", "灵感")
+
+    if not content:
+        return jsonify({"error": "empty content"}), 400
+
+    vault_path = get_user_vault_path()
+    folder_name = FOLDER_MAP.get(category, "02 灵感，想法，随记")
+    folder_path = os.path.join(vault_path, folder_name)
+    os.makedirs(folder_path, exist_ok=True)
+
+    # 生成文件名
+    today = date.today().isoformat()
+    if not title:
+        # 从内容取前 20 个字作为标题
+        title = content.replace("\n", " ")[:20].strip()
+        if not title:
+            title = "未命名"
+
+    if category == "日记":
+        filename = f"{today}  {title}.md"
+    else:
+        filename = f"{title}.md"
+
+    # 避免重名
+    filepath = os.path.join(folder_path, filename)
+    counter = 1
+    while os.path.exists(filepath):
+        if category == "日记":
+            filename = f"{today}  {title} ({counter}).md"
+        else:
+            filename = f"{title} ({counter}).md"
+        filepath = os.path.join(folder_path, filename)
+        counter += 1
+
+    # 写入文件
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"# {title}\n\n{content}\n")
+
+    return jsonify({"ok": True, "filename": filename, "folder": folder_name, "path": filepath})
+
+
+@app.route("/api/dashboard")
+def api_dashboard():
+    """今日概览数据"""
+    vault_path = get_user_vault_path()
+    notes = scan_vault(vault_path)
+    diaries = [n for n in notes if n.date and n.folder == "01 日记"]
+    diaries.sort(key=lambda n: n.date, reverse=True)
+
+    today_str = date.today().isoformat()
+    today_note = next((d for d in diaries if d.date == today_str), None)
+
+    # 本周记了多少天
+    from datetime import timedelta
+    week_ago = (date.today() - timedelta(days=7)).isoformat()
+    this_week_dates = [d.date for d in diaries if d.date >= week_ago]
+    streak = len(set(this_week_dates))
+
+    # 最新日记
+    latest = diaries[0] if diaries else None
+
+    return jsonify({
+        "today": today_str,
+        "total_notes": len(notes),
+        "total_diaries": len(diaries),
+        "week_streak": streak,
+        "has_today_diary": today_note is not None,
+        "latest_diary": {
+            "date": latest.date,
+            "title": latest.title,
+            "preview": latest.content[:150].replace("\n", " "),
+        } if latest else None,
+    })
+
+
 @app.route("/api/task/<tid>")
 def api_task(tid):
     t = tasks.get(tid)

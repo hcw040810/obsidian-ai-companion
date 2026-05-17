@@ -97,6 +97,33 @@ li { margin:4px 0; }
 .search-result { margin:12px 0; padding:16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
 .search-result .match { background:rgba(88,166,255,0.15); padding:2px 4px; border-radius:3px; }
 
+/* ==================== 仪表盘 ==================== */
+.dashboard-greeting { font-size:28px; font-weight:600; margin-bottom:4px; }
+.dashboard-date { color:var(--text2); font-size:14px; margin-bottom:24px; }
+.dashboard-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+.dashboard-stats .metric { cursor:default; }
+.dashboard-stats .metric .val { font-size:28px; }
+.dashboard-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.dashboard-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.dashboard-card h3 { margin:0 0 12px; font-size:15px; color:var(--blue); }
+.dashboard-card .empty { color:var(--text2); font-size:13px; padding:20px 0; text-align:center; }
+.dashboard-diary-preview { font-size:14px; color:var(--text2); line-height:1.8; }
+
+/* ==================== 快速记录 ==================== */
+.fab { position:fixed; bottom:24px; right:24px; width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#7C4DFF,#6D28D9); color:#fff; font-size:28px; border:none; cursor:pointer; box-shadow:0 4px 20px rgba(124,77,255,0.4); z-index:100; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+.fab:hover { transform:scale(1.1); box-shadow:0 6px 24px rgba(124,77,255,0.5); }
+.capture-panel { position:fixed; bottom:90px; right:24px; width:400px; max-width:calc(100vw - 48px); background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:24px; z-index:101; box-shadow:0 8px 40px rgba(0,0,0,0.4); display:none; }
+.capture-panel.show { display:block; animation:slideUp .2s ease; }
+@keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.capture-panel h3 { margin:0 0 16px; font-size:16px; }
+.capture-panel textarea { width:100%; min-height:120px; margin-bottom:12px; font-size:14px; }
+.capture-panel .title-input { width:100%; margin-bottom:12px; }
+.capture-categories { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.capture-cat { padding:6px 14px; border-radius:20px; border:1px solid var(--border); background:var(--bg); color:var(--text2); cursor:pointer; font-size:13px; transition:all .15s; }
+.capture-cat:hover { border-color:var(--text2); }
+.capture-cat.active { border-color:#7C4DFF; background:rgba(124,77,255,0.15); color:#B794F4; }
+.capture-status { font-size:13px; margin-top:8px; min-height:20px; }
+
 /* ==================== 手机适配 ==================== */
 @media (max-width: 768px) {
   .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -114,6 +141,11 @@ li { margin:4px 0; }
   textarea { min-height: 150px; font-size: 13px; }
   .expander summary { font-size: 13px; }
   table { font-size: 12px; }
+  .dashboard-greeting { font-size: 22px; }
+  .dashboard-stats { grid-template-columns: repeat(2,1fr); }
+  .dashboard-row { grid-template-columns: 1fr; }
+  .capture-panel { right: 12px; left: 12px; width: auto; bottom: 80px; }
+  .fab { bottom: 16px; right: 16px; }
 }
 .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; margin:2px; }
 .tag.green { background:#0d2818; color:var(--green); border:1px solid #238636; }
@@ -161,49 +193,53 @@ li { margin:4px 0; }
 </head>
 <body>
 
-<!-- 连接/上传遮罩 -->
+<!-- 首次打开引导 -->
 <div id="upload-overlay" class="upload-overlay hidden">
   <div class="upload-box">
-    <h2>🧠 连接你的 Obsidian</h2>
-    <p>选择数据源，AI 会读取并分析你的笔记</p>
+    <h2>🧠 观察者</h2>
+    <p>你的个人 AI 伴侣 — 读过你所有笔记，真正理解你</p>
 
-    <!-- 方式一：连接本地 Obsidian -->
-    <div id="connect-section">
-      <div class="connect-card" id="connect-card">
-        <h3 style="margin:0 0 12px;font-size:16px;">🔌 连接本地 Obsidian（推荐）</h3>
-        <p style="color:var(--text2);font-size:13px;margin-bottom:16px;">需要在 Obsidian 中安装「Local REST API」插件</p>
-        <div style="text-align:left;margin-bottom:12px;">
-          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API 地址</label>
-          <input type="text" id="obsidian-url" class="input" placeholder="http://127.0.0.1:27123" style="margin-bottom:10px;">
-          <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API Key</label>
-          <input type="text" id="obsidian-key" class="input" placeholder="在 Obsidian 设置 → Local REST API 中找到">
+    <!-- 主选项：直接体验 -->
+    <div style="margin:24px 0;">
+      <button class="btn primary" onclick="skipUpload()" style="width:100%;padding:14px;font-size:16px;margin-bottom:12px;">✨ 直接体验（使用示例笔记）</button>
+      <p style="color:var(--text2);font-size:12px;text-align:center;">先看看效果，之后再连接自己的笔记</p>
+    </div>
+
+    <div style="margin:16px 0;color:var(--text2);font-size:13px;text-align:center;">— 有笔记库的话 —</div>
+
+    <!-- 上传笔记文件夹 -->
+    <details class="expander" style="margin-bottom:8px;">
+      <summary>📂 上传笔记文件夹</summary>
+      <div class="content" style="padding:16px;">
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('vault-input').click()" style="margin:0;">
+          <input type="file" id="vault-input" webkitdirectory multiple>
+          <div class="icon" style="font-size:36px;">📁</div>
+          <div class="text">点击选择文件夹，或拖拽到这里</div>
         </div>
-        <button class="btn primary" onclick="connectObsidian()" style="width:100%;margin-bottom:8px;" id="connect-btn">连接</button>
-        <div id="connect-status" style="font-size:13px;min-height:20px;"></div>
+        <div class="progress" id="upload-progress">
+          <div class="bar"><div class="fill" id="upload-fill"></div></div>
+          <div class="status" id="upload-status">上传中...</div>
+        </div>
       </div>
+    </details>
 
-      <div style="margin:16px 0;color:var(--text2);font-size:13px;">— 或者 —</div>
-
-      <!-- 方式二：上传文件夹 -->
-      <details class="expander">
-        <summary>📂 上传文件夹</summary>
-        <div class="content" style="padding:16px;">
-          <div class="upload-area" id="upload-area" onclick="document.getElementById('vault-input').click()" style="margin:0;">
-            <input type="file" id="vault-input" webkitdirectory multiple>
-            <div class="icon" style="font-size:36px;">📁</div>
-            <div class="text">点击选择文件夹，或拖拽到这里</div>
+    <!-- 连接本地 Obsidian（高级） -->
+    <details class="expander">
+      <summary>🔌 连接本地 Obsidian（高级）</summary>
+      <div class="content" style="padding:16px;">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">需要在 Obsidian 中安装「Local REST API」插件</p>
+        <div class="connect-card" id="connect-card" style="border:none;padding:0;">
+          <div style="text-align:left;margin-bottom:12px;">
+            <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API 地址</label>
+            <input type="text" id="obsidian-url" class="input" placeholder="http://127.0.0.1:27123" style="margin-bottom:10px;">
+            <label style="font-size:13px;color:var(--text2);display:block;margin-bottom:4px;">API Key</label>
+            <input type="text" id="obsidian-key" class="input" placeholder="在 Obsidian 设置 → Local REST API 中找到">
           </div>
-          <div class="progress" id="upload-progress">
-            <div class="bar"><div class="fill" id="upload-fill"></div></div>
-            <div class="status" id="upload-status">上传中...</div>
-          </div>
+          <button class="btn primary" onclick="connectObsidian()" style="width:100%;margin-bottom:8px;" id="connect-btn">连接</button>
+          <div id="connect-status" style="font-size:13px;min-height:20px;"></div>
         </div>
-      </details>
-    </div>
-
-    <div class="skip">
-      <a onclick="skipUpload()">跳过，使用默认示例仓库</a>
-    </div>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -225,7 +261,8 @@ li { margin:4px 0; }
 
 <div id="main-content" class="mobile-main" style="margin-left:260px;padding:24px 32px;max-width:1200px;">
   <div class="tabs" role="tablist">
-    <button class="tab active" data-tab="chat" role="tab">💬 对话</button>
+    <button class="tab active" data-tab="dashboard" role="tab">🏠 今日概览</button>
+    <button class="tab" data-tab="chat" role="tab">💬 对话</button>
     <button class="tab" data-tab="search" role="tab">🔍 搜索回忆</button>
     <button class="tab" data-tab="profile" role="tab">👤 人格画像</button>
     <button class="tab" data-tab="diary" role="tab">📊 日记分析</button>
@@ -234,8 +271,29 @@ li { margin:4px 0; }
     <button class="tab" data-tab="study" role="tab">📚 考研驾驶舱</button>
   </div>
 
+  <!-- 今日概览 -->
+  <div class="tabcontent active" id="tab-dashboard">
+    <div class="dashboard-greeting" id="dash-greeting">早上好 👋</div>
+    <div class="dashboard-date" id="dash-date"></div>
+    <div class="dashboard-stats" id="dash-stats"></div>
+    <div class="dashboard-row">
+      <div class="dashboard-card" id="dash-diary">
+        <h3>📝 最近日记</h3>
+        <div class="empty">加载中...</div>
+      </div>
+      <div class="dashboard-card" id="dash-quick">
+        <h3>💬 和观察者聊聊</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px">AI 读过你的所有笔记，有什么想聊的？</p>
+        <div style="display:flex;gap:8px;">
+          <input class="input" id="dash-chat-input" placeholder="随便说点什么..." onkeydown="if(event.key==='Enter')dashQuickChat()" style="flex:1">
+          <button class="btn primary" onclick="dashQuickChat()">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 对话 -->
-  <div class="tabcontent active" id="tab-chat">
+  <div class="tabcontent" id="tab-chat">
     <h2>和观察者聊聊</h2>
     <p style="color:var(--text2);margin-bottom:16px;font-size:14px">我已经读过你 Obsidian 里的所有内容，随便聊</p>
     <div class="chat-area" id="chat-messages"></div>
@@ -784,6 +842,9 @@ api('/api/summary').then(s => {
   document.getElementById('sidebar-stats').innerHTML = h;
 });
 
+// 加载仪表盘
+loadDashboard();
+
 let loaded = {};
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', async () => {
@@ -1256,6 +1317,25 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 </script>
 
+<!-- 快速记录浮动按钮 -->
+<button class="fab" id="fab-capture" onclick="toggleCapture()">+</button>
+
+<!-- 快速记录面板 -->
+<div class="capture-panel" id="capture-panel">
+  <h3>⚡ 快速记录</h3>
+  <textarea id="capture-content" placeholder="此刻的想法、灵感或待办..." oninput="onCaptureInput()"></textarea>
+  <input class="input title-input" id="capture-title" placeholder="标题（可选，AI 会自动建议）">
+  <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">AI 建议分类：</div>
+  <div class="capture-categories" id="capture-categories">
+    <span class="capture-cat active" data-cat="日记" onclick="selectCat(this)">📝 日记</span>
+    <span class="capture-cat" data-cat="灵感" onclick="selectCat(this)">💡 灵感</span>
+    <span class="capture-cat" data-cat="待办" onclick="selectCat(this)">📋 待办</span>
+    <span class="capture-cat" data-cat="知识" onclick="selectCat(this)">📚 知识</span>
+  </div>
+  <button class="btn primary" onclick="saveCapture()" style="width:100%;">保存到笔记库</button>
+  <div class="capture-status" id="capture-status"></div>
+</div>
+
 <!-- PWA 安装提示 -->
 <div id="pwa-install-banner" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10001;background:var(--bg2);border:1px solid var(--blue);border-radius:12px;padding:14px 20px;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.4);max-width:90vw;">
   <span style="font-size:20px;">📲</span>
@@ -1268,6 +1348,143 @@ document.querySelectorAll('.tab').forEach(t => {
 </div>
 
 <script>
+// ==================== 今日概览 ====================
+async function loadDashboard() {
+  try {
+    const d = await api('/api/dashboard');
+    // 问候语
+    const hour = new Date().getHours();
+    const greeting = hour < 6 ? '夜深了 🌙' : hour < 12 ? '早上好 ☀️' : hour < 18 ? '下午好 🌤️' : '晚上好 🌙';
+    document.getElementById('dash-greeting').textContent = greeting;
+    // 日期
+    const today = new Date();
+    const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+    document.getElementById('dash-date').textContent = `${today.getMonth()+1}月${today.getDate()}日 ${weekdays[today.getDay()]}`;
+    // 统计卡片
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="metric"><div class="val">${d.total_notes}</div><div class="label">笔记总数</div></div>
+      <div class="metric"><div class="val">${d.total_diaries}</div><div class="label">日记篇数</div></div>
+      <div class="metric"><div class="val">${d.week_streak}</div><div class="label">本周记录</div></div>
+      <div class="metric"><div class="val">${d.has_today_diary ? '✅' : '—'}</div><div class="label">今日日记</div></div>
+    `;
+    // 最近日记
+    const diaryEl = document.getElementById('dash-diary');
+    if (d.latest_diary) {
+      diaryEl.innerHTML = `<h3>📝 最近日记</h3><div style="margin-bottom:8px;"><b>${esc(d.latest_diary.title)}</b> <span style="color:var(--text2);font-size:12px">${esc(d.latest_diary.date)}</span></div><div class="dashboard-diary-preview">${esc(d.latest_diary.preview)}...</div>`;
+    }
+  } catch(e) {
+    console.error('Dashboard load error:', e);
+  }
+}
+
+function dashQuickChat() {
+  const input = document.getElementById('dash-chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  // 切换到对话 tab 并发送
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tabcontent').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-tab="chat"]').classList.add('active');
+  document.getElementById('tab-chat').classList.add('active');
+  document.getElementById('chat-input').value = msg;
+  sendChat();
+  input.value = '';
+}
+
+// ==================== 快速记录 ====================
+let captureTimer = null;
+let selectedCategory = '日记';
+
+function toggleCapture() {
+  const panel = document.getElementById('capture-panel');
+  panel.classList.toggle('show');
+  if (panel.classList.contains('show')) {
+    document.getElementById('capture-content').focus();
+  }
+}
+
+function selectCat(el) {
+  document.querySelectorAll('.capture-cat').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectedCategory = el.dataset.cat;
+}
+
+function onCaptureInput() {
+  clearTimeout(captureTimer);
+  const content = document.getElementById('capture-content').value.trim();
+  if (content.length < 5) return;
+  captureTimer = setTimeout(() => classifyCapture(content), 1000);
+}
+
+async function classifyCapture(content) {
+  const status = document.getElementById('capture-status');
+  status.innerHTML = '<span style="color:var(--text2)"><span class="spinner"></span> AI 分析中...</span>';
+  try {
+    const { task_id } = await api('/api/notes/classify', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content}) });
+    pollTask(task_id, 1500, (err, r) => {
+      status.innerHTML = '';
+      if (err || !r) return;
+      // 高亮 AI 推荐的分类
+      if (r.category) {
+        document.querySelectorAll('.capture-cat').forEach(c => {
+          c.classList.remove('active');
+          if (c.dataset.cat === r.category) c.classList.add('active');
+        });
+        selectedCategory = r.category;
+      }
+      // 填入建议标题
+      if (r.title && !document.getElementById('capture-title').value) {
+        document.getElementById('capture-title').value = r.title;
+      }
+      status.innerHTML = `<span style="color:var(--green)">✓ AI 建议：${esc(r.category)}${r.title ? ' · "' + esc(r.title) + '"' : ''}</span>`;
+    });
+  } catch(e) {
+    status.innerHTML = '';
+  }
+}
+
+async function saveCapture() {
+  const content = document.getElementById('capture-content').value.trim();
+  if (!content) return;
+  const title = document.getElementById('capture-title').value.trim();
+  const status = document.getElementById('capture-status');
+  status.innerHTML = '<span style="color:var(--text2)"><span class="spinner"></span> 保存中...</span>';
+
+  try {
+    const r = await api('/api/notes/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({content, title, category:selectedCategory}) });
+    if (r.ok) {
+      status.innerHTML = `<span style="color:var(--green)">✅ 已保存到 ${esc(r.folder)}/${esc(r.filename)}</span>`;
+      // 清空
+      setTimeout(() => {
+        document.getElementById('capture-content').value = '';
+        document.getElementById('capture-title').value = '';
+        document.getElementById('capture-panel').classList.remove('show');
+        status.innerHTML = '';
+        // 刷新仪表盘和侧边栏
+        loadDashboard();
+        api('/api/summary').then(s => {
+          let h = `<div class="stat"><b>笔记总数</b>：${s.total} 篇</div><hr style="border-color:var(--border);margin:10px 0">`;
+          for (const [f, c] of Object.entries(s.folders)) h += `<div class="folder">📁 ${f}：${c} 篇</div>`;
+          document.getElementById('sidebar-stats').innerHTML = h;
+        });
+      }, 1500);
+    } else {
+      status.innerHTML = `<span style="color:var(--red)">保存失败：${esc(r.error || '未知错误')}</span>`;
+    }
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--red)">保存失败：${esc(e.message)}</span>`;
+  }
+}
+
+// 点击面板外部关闭
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('capture-panel');
+  const fab = document.getElementById('fab-capture');
+  if (panel.classList.contains('show') && !panel.contains(e.target) && e.target !== fab) {
+    panel.classList.remove('show');
+  }
+});
+
 // ==================== PWA ====================
 // 注册 Service Worker
 if ('serviceWorker' in navigator) {
